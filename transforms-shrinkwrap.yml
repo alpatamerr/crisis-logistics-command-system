@@ -1,0 +1,32 @@
+---
+mappings:
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/incidents"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.e8161976-d66f-4ab4-b14e-fd11f4e31883"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/locations"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.fdc911ca-e903-4de6-a722-4212d35d842e"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/resources"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.f50684ac-6e9d-400c-a73a-ff65b8666d37"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/routes"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.9288869b-eeb7-4296-bd33-c13781ba56f9"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/derived_resources"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.6c91fc7d-5541-4fa6-98cb-a2ea9aaeda94"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/derived_routes"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.162b9a21-c95c-4fed-939e-f7ecf91dd3c5"
