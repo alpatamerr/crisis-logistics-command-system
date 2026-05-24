@@ -1,0 +1,221 @@
+# DO NOT MODIFY OR DELETE THIS FILE.
+#
+# ANY CHANGES MAY RESULT IN SERIOUS DAMAGE
+# TO THE TECHNICAL INFRASTRUCTURE AND LOSS OF DATA!
+#
+# ACCESS TO OR USE OF PALANTIR FOUNDRY IS SUBJECT
+# TO PALANTIR’S TECHNICAL SPECIFICATIONS AVAILABLE
+# IN THE DOCUMENTATION. THIS WARNING CONSTITUTES AN
+# ADDITION TO THOSE TECHNICAL SPECIFICATIONS AND
+# NON-COMPLIANCE MAY CONSTITUTE A VIOLATION OF
+# THE FOUNDRY LICENSE AGREEMENT.
+
+java-version: java_17
+
+env:
+  transformsGradleDistributionUrl:
+    uri-role: gradle-distribution-8-12-1
+  ORG_GRADLE_PROJECT_transformsBuildUriV2:
+    uri-role: build2-api
+  ORG_GRADLE_PROJECT_transformsCompassUri:
+    uri-role: compass-api
+  ORG_GRADLE_PROJECT_transformsJemmaUri:
+    uri-role: jemma-api
+  ORG_GRADLE_PROJECT_condaInstallerUri:
+    uri-role: conda-installer
+  ORG_GRADLE_PROJECT_condaInstallerUriPy2:
+    uri-role: conda-installer8-py2
+  ORG_GRADLE_PROJECT_condaInstallerUriPy3:
+    uri-role: conda-installer8-py3
+  ORG_GRADLE_PROJECT_condaInstallerUriPy3Mamba:
+    uri-role: conda-installer8-py3mamba
+  ORG_GRADLE_PROJECT_mambaInstaller:
+    uri-role: mamba-installer2
+  ORG_GRADLE_PROJECT_mambaInstaller3:
+    uri-role: mamba-installer3
+  ORG_GRADLE_PROJECT_mambaInstaller8:
+    uri-role: mamba-installer8
+  ORG_GRADLE_PROJECT_transformsCondaRepositoryProxyApiUri:
+    uri-role: conda-repository-proxy-authz-api
+  ORG_GRADLE_PROJECT_transformsCondaRepositoryProxyPublicRepoUri:
+    uri-role: conda-repository-proxy-authz-public
+  ORG_GRADLE_PROJECT_transformsDataHealthUri:
+    uri-role: data-health-api
+  ORG_GRADLE_PROJECT_artifactsUri:
+    uri-role: foundry-artifacts-api
+  ORG_GRADLE_PROJECT_transformsCatalogUri:
+    uri-role: foundry-catalog-api
+  ORG_GRADLE_PROJECT_flinkClusterManagerUri:
+    uri-role: flink-cluster-manager-api
+  ORG_GRADLE_PROJECT_foundryMlUri:
+    uri-role: foundry-ml-api
+  ORG_GRADLE_PROJECT_modelsUri:
+    uri-role: models-api
+  ORG_GRADLE_PROJECT_mioUri:
+    uri-role: mio-api
+  ORG_GRADLE_PROJECT_multipassUri:
+    uri-role: multipass-api
+  ORG_GRADLE_PROJECT_transformsSchemaUri:
+    uri-role: foundry-metadata-api
+  ORG_GRADLE_PROJECT_jemmaLogReceiverUri:
+    uri-role: log-receiver-api-jemma-alias
+  ORG_GRADLE_PROJECT_transformsMavenProxyRepoUri:
+    uri-role: maven-repository-proxy-authz
+  ORG_GRADLE_PROJECT_transformsShrinkwrapServiceUri:
+    uri-role: shrinkwrap-service-api
+  ORG_GRADLE_PROJECT_transformsServiceUri:
+    uri-role: transforms-service-api
+  ORG_GRADLE_PROJECT_sparkConfigurationServiceUri:
+    uri-role: spark-configuration-service-api
+  ORG_GRADLE_PROJECT_transformsStreamCatalogUri:
+    uri-role: stream-catalog-api
+  ORG_GRADLE_PROJECT_foundryTelemetryServiceUri:
+    uri-role: foundry-telemetry-service-api
+  ORG_GRADLE_PROJECT_magritteCoordinatorUri:
+    uri-role: magritte-coordinator-api
+  ORG_GRADLE_PROJECT_magritteCoordinatorCiUri:
+    uri-role: magritte-coordinator-ci-api
+  ORG_GRADLE_PROJECT_stemmaGit:
+    uri-role: stemma-git
+  ORG_GRADLE_PROJECT_tablesUri:
+    uri-role: tables-api
+  ORG_GRADLE_PROJECT_transformsWorkerUri:
+    uri-role: transforms-worker-api
+  FOUNDRYTS_CODEX_HUB_URIS:
+    uri-role: codex-hub-api
+  ORG_GRADLE_PROJECT_foundryIcebergUri:
+    uri-role: foundry-iceberg-api
+
+required-job-token-capabilities:
+  - transforms
+
+jobs:
+  foundry-publish:
+    timeout: 20 minutes
+    steps:
+    - |
+      set -euo pipefail
+
+      unset SUDO_UID SUDO_GID SUDO_USER
+
+      [[ -n "${JAVA_HOME-}" && -d "$JAVA_HOME" ]] || {
+          echo "JAVA_HOME was not set or did not point to a valid directory."
+          exit 1
+      }
+      maxJvmHeapMB=2048
+      if [ -z ${KUBERNETES_PORT+x} ]; then 
+        maxJvmHeapMB=1024
+      fi
+      export GRADLE_OPTS="-Dorg.gradle.jvmargs='-Xmx${maxJvmHeapMB}m' -Djavax.net.ssl.trustStore=${STEMMA_DEFAULT_TRUST_STORE_PATH} -Dfile.encoding=UTF8 -Dgradle.wrapperUser='' -Dgradle.wrapperPassword=${JOB_TOKEN}"
+      export JAVA_OPTS="-Dorg.gradle.jvmargs='-Xmx${maxJvmHeapMB}m' -Djavax.net.ssl.trustStore=${STEMMA_DEFAULT_TRUST_STORE_PATH} -Dfile.encoding=UTF8 -Dgradle.wrapperUser='' -Dgradle.wrapperPassword=${JOB_TOKEN}"
+      export ORG_GRADLE_PROJECT_transformsTrustStore="${STEMMA_DEFAULT_TRUST_STORE_PATH}"
+      export ORG_GRADLE_PROJECT_transformsBearerToken="${JOB_TOKEN}"
+      export ORG_GRADLE_PROJECT_transformsRepoRid="${REPOSITORY_RID}"
+      export ORG_GRADLE_PROJECT_clonedArtifactsRepoRid="${CLONED_ARTIFACTS_REPOSITORY_RID}"
+      export ORG_GRADLE_PROJECT_transformsMavenProxyRepoUri="${ORG_GRADLE_PROJECT_artifactsUri}/repositories/${REPOSITORY_RID}/contents/migration/maven"
+      export ORG_GRADLE_PROJECT_autoConfigureBackingRepositories="true"
+      export ORG_GRADLE_PROJECT_branchIsProtected=${JEMMA_IS_PROTECTED_BRANCH:-"false"}
+
+      if [ -z ${JEMMA_BRANCH+x} ]; then
+        echo "The JEMMA_BRANCH variable is unset. We cannot publish without a branch, so please make sure that \
+      we are on a branch. If you are attempting to tag transforms repository, that is not supported and your transforms \
+      will always run latest commit on a given branch."
+        exit 1
+      fi
+
+      condaLocksVersion=1
+      condaLocksMinVersion=${JEMMA_CONDA_LOCKS_MIN_VERSION:-0}
+      if [ "$condaLocksVersion" -ge "$condaLocksMinVersion" ];
+      then
+        export ORG_GRADLE_PROJECT_applyCondaLocksPatch="true";
+      fi
+
+      if ! grep -q condaSolveImplementation gradle.properties;
+      then
+        mambaFlagVersion=1
+        mambaMinVersion=${JEMMA_MAMBA_MIN_VERSION:-1}
+        if [ "$mambaFlagVersion" -ge "$mambaMinVersion" ];
+        then
+          export ORG_GRADLE_PROJECT_condaSolveImplementation="mamba"
+        fi
+      fi
+
+      if grep -q "useHawkAsDefaultSolver[[:space:]]*=[[:space:]]*true" gradle.properties;
+      then
+        hawkFlagVersion=3
+        hawkMinVersion=${JEMMA_HAWK_MIN_VERSION:-0}
+        if [ "$hawkFlagVersion" -eq "$hawkMinVersion" ];
+        then
+          export ORG_GRADLE_PROJECT_enableHawkSolverMode="true"
+        fi
+      fi
+
+      stackedPacksVersion=2
+      stackedPacksJemmaVersion=${JEMMA_STACKED_PACKS_VERSION:-0}
+      if [ "$stackedPacksVersion" -eq "$stackedPacksJemmaVersion" ];
+      then
+        export ORG_GRADLE_PROJECT_enableStackedPacksMode="true";
+      fi
+      
+      # Repo-level gradle.properties overrides stack level JEMMA_USE_HAWK_PACK
+      hawkPackVersion=2
+      hawkPackJemmaVersion=${JEMMA_USE_HAWK_PACK:-0}
+      if [ "$hawkPackVersion" -eq "$hawkPackJemmaVersion" ];
+      then
+        echo "[Stack level override] ORG_GRADLE_PROJECT_envPackingLogicVersion=$JEMMA_USE_HAWK_PACK"
+        export ORG_GRADLE_PROJECT_envPackingLogicVersion="$JEMMA_USE_HAWK_PACK"
+      else
+        unset ORG_GRADLE_PROJECT_envPackingLogicVersion
+      fi
+
+      # Repo-level gradle.properties overrides stack level JEMMA_USE_HAWK_UV
+      hawkUvVersion=1
+      hawkUvJemmaVersion=${JEMMA_USE_HAWK_UV:-0}
+      if [ "$hawkUvVersion" -ge "$hawkUvJemmaVersion" ];
+      then
+        if grep -q "useHawkUvSolver[[:space:]]*=[[:space:]]*false" gradle.properties;
+        then
+          echo "[Repo level override] ORG_GRADLE_PROJECT_enableHawkUv=false"
+          export ORG_GRADLE_PROJECT_enableHawkUv="false"
+        else
+          echo "[Stack level override] ORG_GRADLE_PROJECT_enableHawkUv=true"
+          export ORG_GRADLE_PROJECT_enableHawkUv="true"
+        fi
+      fi
+
+      gradlePropValue=$(awk -F'=' '/envPackingLogicVersion/ {print $2}' gradle.properties | tr -d ' ')
+      if [ -n "$gradlePropValue" ]; then
+        echo "[Repo level override] ORG_GRADLE_PROJECT_envPackingLogicVersion=$gradlePropValue"
+        export ORG_GRADLE_PROJECT_envPackingLogicVersion="$gradlePropValue"
+      fi
+      
+      transformsServicePublishing=1
+      transformsServicePublishingJemmaVersion=${JEMMA_TRANSFORMS_SERVICE_PUBLISHING_VERSION:-0}
+      if [ "$transformsServicePublishing" -eq "$transformsServicePublishingJemmaVersion" ];
+      then
+        export ORG_GRADLE_PROJECT_enableTransformsServicePublishing="true";
+      fi
+      
+      transformsServiceGraphChecking=1
+      transformsServiceGraphCheckingJemmaVersion=${JEMMA_TRANSFORMS_SERVICE_GRAPH_CHECKING_VERSION:-0}
+      if [ "$transformsServiceGraphChecking" -eq "$transformsServiceGraphCheckingJemmaVersion" ];
+      then
+        export ORG_GRADLE_PROJECT_enableTransformsServiceGraphChecking="true";
+      fi
+
+      transformsServiceShrinkwrapRendering=1
+      transformsServiceShrinkwrapRenderingJemmaVersion=${JEMMA_TRANSFORMS_SERVICE_SHRINKWRAP_RENDERING_VERSION:-0}
+      if [ "$transformsServiceShrinkwrapRendering" -eq "$transformsServiceShrinkwrapRenderingJemmaVersion" ];
+      then
+        export ORG_GRADLE_PROJECT_enableTransformsServiceShrinkwrapRendering="true";
+      fi
+
+      maestroPackageBuildingVersion=1
+      maestroPackageBuildingVersionJemmaVersion=${JEMMA_MAESTRO_PACKAGE_BUILDING_VERSION:-0}
+      if [ "$maestroPackageBuildingVersion" -eq "$maestroPackageBuildingVersionJemmaVersion" ];
+      then
+        export ORG_GRADLE_PROJECT_enableMaestroPackageBuildingVersion="true";
+      fi
+
+      # For more detailed output from CI checks, add "--info" to the end of the "./gradlew" command below.
+      ./gradlew --no-daemon --build-cache --stacktrace patch publish
