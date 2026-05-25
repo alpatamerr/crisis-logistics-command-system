@@ -22,10 +22,9 @@ TARGET_INFRASTRUCTURE = [
 def discover_nearby_infrastructure(validated_hubs, discovered_infrastructure, source: ResolvedSource):
     api_key = source.get_secret("additionalSecretGoogleMapsApiKey")
     
-    # Native Cost Guard: Foundry's @incremental() decorator automatically reads only 
-    # the new rows when incremental, and falls back to all rows on a snapshot build.
-    new_hubs_df = validated_hubs.dataframe()
-    df = new_hubs_df.toPandas()
+    # Grab the incoming PySpark DataFrame
+    hubs_dataframe = validated_hubs.dataframe()
+    df = hubs_dataframe.toPandas()
     
     assets_discovered = []
     
@@ -61,5 +60,6 @@ def discover_nearby_infrastructure(validated_hubs, discovered_infrastructure, so
                 continue
 
     if assets_discovered:
-        spark_df = discovered_infrastructure.spark_session.createDataFrame(assets_discovered)
+        # FIX: Borrow the active sparkSession directly from the input dataset dataframe
+        spark_df = hubs_dataframe.sparkSession.createDataFrame(assets_discovered)
         discovered_infrastructure.write_dataframe(spark_df)
