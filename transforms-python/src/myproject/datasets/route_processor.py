@@ -21,15 +21,12 @@ TARGET_INFRASTRUCTURE = [
 )
 def discover_nearby_infrastructure(validated_hubs, discovered_infrastructure, source: ResolvedSource):
     api_key = source.get_secret("additionalSecretGoogleMapsApiKey")
-    hubs_dataframe = validated_hubs.dataframe()
     
-    # Cost Guard: Identify and isolate only new rows since the previous run
-    if validated_hubs.is_incremental:
-        new_hubs_df = hubs_dataframe.subtract(validated_hubs.prior_version().dataframe())
-    else:
-        new_hubs_df = hubs_dataframe
-
+    # Native Cost Guard: Foundry's @incremental() decorator automatically reads only 
+    # the new rows when incremental, and falls back to all rows on a snapshot build.
+    new_hubs_df = validated_hubs.dataframe()
     df = new_hubs_df.toPandas()
+    
     assets_discovered = []
     
     if df.empty:
