@@ -1,67 +1,68 @@
-from transforms.api import transform, Input, Output
-from pyspark.sql import functions as F
+from transforms.api import transform, Input, Output, incremental
+from transforms.external.systems import external_systems, Source, ResolvedSource
+import requests
+import logging
 
+logger = logging.getLogger(__name__)
+
+# Enterprise Array: Add or remove any Google API category string here to scale dynamically
+TARGET_INFRASTRUCTURE = [
+    "hospital",
+    "fire_station",
+    "police",
+    "gas_station"
+]
+
+@external_systems(source=Source("ri.magritte..source.0049ef11-1810-4389-96bb-de55ac0f528f"))
+@incremental()
 @transform(
-    output_df=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/derived_routes"),
-    routes_in=Input("/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/routes"),
-    locations_in=Input("/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/locations"),
-    incidents_in=Input("/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/incidents")
+    discovered_infrastructure=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/nearby_infrastructure"),
+    validated_hubs=Input("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/validated_logistics_hubs")
 )
-def compute_route_blocks(output_df, routes_in, locations_in, incidents_in):
-    routes = routes_in.dataframe()
-    locations = locations_in.dataframe()
-    # Only pull active incidents (where resolved_at is blank!)
-    incidents = incidents_in.dataframe().filter(F.col("resolved_at").isNull() | (F.col("resolved_at") == ""))
-
-    # Bring coordinates onto the routes table for both origin and destination
-    loc_coords = locations.select("location_id", "latitude", "longitude")
+def discover_nearby_infrastructure(validated_hubs, discovered_infrastructure, source: ResolvedSource):
+    api_key = source.get_secret("additionalSecretGoogleMapsApiKey")
+    hubs_dataframe = validated_hubs.dataframe()
     
-    routes_with_geo = routes \
-        .join(loc_coords.withColumnRenamed("latitude", "orig_lat").withColumnRenamed("longitude", "orig_lon"), 
-              routes.origin_location_id == loc_coords.location_id, "inner") \
-        .drop("location_id") \
-        .join(loc_coords.withColumnRenamed("latitude", "dest_lat").withColumnRenamed("longitude", "dest_lon"), 
-              routes.destination_location_id == loc_coords.location_id, "inner") \
-        .drop("location_id")
+    # Cost Guard: Identify and isolate only new rows since the previous run
+    if validated_hubs.is_incremental:
+        new_hubs_df = hubs_dataframe.subtract(validated_hubs.prior_version().dataframe())
+    else:
+        new_hubs_df = hubs_dataframe
 
-    # Cross-join routes with active incidents to calculate spatial intersections
-    combined = routes_with_geo.crossJoin(incidents)
+    df = new_hubs_df.toPandas()
+    assets_discovered = []
+    
+    if df.empty:
+        logger.info("Zero new tracking coordinates detected. API pipeline idle.")
+        return
 
-    # Approximate km distance from route endpoints to incident center
-    combined = combined.withColumn(
-        "dist_orig_to_inc",
-        F.sqrt(((F.col("orig_lat") - F.col("latitude")) * 111.0)**2 + ((F.col("orig_lon") - F.col("longitude")) * 69.0)**2)
-    ).withColumn(
-        "dist_dest_to_inc",
-        F.sqrt(((F.col("dest_lat") - F.col("latitude")) * 111.0)**2 + ((F.col("dest_lon") - F.col("longitude")) * 69.0)**2)
-    )
+    for index, row in df.iterrows():
+        hub_name = row.get('hub_name', f"Zone_{index}")
+        lat, lng = row['lat'], row['lng']
+        
+        for infra_type in TARGET_INFRASTRUCTURE:
+            url = f"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={lat},{lng}&radius=5000&type={infra_type}&key={api_key}"
+            
+            try:
+                response = requests.get(url, timeout=10)
+                data = response.json()
+                status = data.get("status")
+                
+                if status == "OK":
+                    for place in data.get("results", []):
+                        assets_discovered.append({
+                            "logistics_hub_origin": hub_name,
+                            "infrastructure_category": infra_type,
+                            "asset_name": place.get("name"),
+                            "place_unique_id": place.get("place_id"),
+                            "asset_lat": place.get("geometry", {}).get("location", {}).get("lat"),
+                            "asset_lng": place.get("geometry", {}).get("location", {}).get("lng"),
+                            "asset_address": place.get("vicinity")
+                        })
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Network call dropped for {hub_name}: {str(e)}")
+                continue
 
-    # If any endpoint falls within an active incident's radius, alter road status
-    combined = combined.withColumn(
-        "computed_status",
-        F.when(
-            ((F.col("dist_orig_to_inc") <= F.col("impact_radius_km")) | (F.col("dist_dest_to_inc") <= F.col("impact_radius_km"))) & (F.col("severity_level") >= 4),
-            "BLOCKED"
-        ).when(
-            ((F.col("dist_orig_to_inc") <= F.col("impact_radius_km")) | (F.col("dist_dest_to_inc") <= F.col("impact_radius_km"))) & (F.col("severity_level") < 4),
-            "CONGESTED"
-        ).otherwise("OPEN")
-    )
-
-    # Group back to unique routes, choosing the worst status if multiple incidents touch a route
-    final_routes = combined.groupBy(
-        "route_id", "origin_location_id", "destination_location_id", "distance_km", "base_travel_time_mins"
-    ).agg(
-        F.min(
-            F.when(F.col("computed_status") == "BLOCKED", 1)
-            .when(F.col("computed_status") == "CONGESTED", 2)
-            .otherwise(3)
-        ).alias("status_rank")
-    ).withColumn(
-        "status",
-        F.when(F.col("status_rank") == 1, "BLOCKED")
-        .when(F.col("status_rank") == 2, "CONGESTED")
-        .otherwise("OPEN")
-    ).drop("status_rank")
-
-    output_df.write_dataframe(final_routes)
+    if assets_discovered:
+        spark_df = discovered_infrastructure.spark_session.createDataFrame(assets_discovered)
+        discovered_infrastructure.write_dataframe(spark_df)
