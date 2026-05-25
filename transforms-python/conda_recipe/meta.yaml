@@ -27,6 +27,7 @@ requirements:
     - transforms-preview
     - transforms-verbs
     - foundry-transforms-lib-python
+    - transforms-external-systems
 
 build:
   script: python setup.py install --single-version-externally-managed --record=record.txt
