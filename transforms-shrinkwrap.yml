@@ -1,32 +1,33 @@
 ---
 mappings:
-- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/incidents"
-  modes:
-  - "READ"
-  path: "/deprecated-field"
-  rid: "ri.foundry.main.dataset.e8161976-d66f-4ab4-b14e-fd11f4e31883"
-- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/locations"
-  modes:
-  - "READ"
-  path: "/deprecated-field"
-  rid: "ri.foundry.main.dataset.fdc911ca-e903-4de6-a722-4212d35d842e"
-- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/resources"
-  modes:
-  - "READ"
-  path: "/deprecated-field"
-  rid: "ri.foundry.main.dataset.f50684ac-6e9d-400c-a73a-ff65b8666d37"
-- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/01_raw_data/routes"
-  modes:
-  - "READ"
-  path: "/deprecated-field"
-  rid: "ri.foundry.main.dataset.9288869b-eeb7-4296-bd33-c13781ba56f9"
 - alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/derived_resources"
   modes:
   - "BUILD"
   path: "/deprecated-field"
   rid: "ri.foundry.main.dataset.6c91fc7d-5541-4fa6-98cb-a2ea9aaeda94"
-- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/derived_routes"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/nearby_infrastructure"
   modes:
   - "BUILD"
   path: "/deprecated-field"
-  rid: "ri.foundry.main.dataset.162b9a21-c95c-4fed-939e-f7ecf91dd3c5"
+  rid: "ri.foundry.main.dataset.0188eb65-eb2f-4b4f-8a72-c0003eb00b7b"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/validated_logistics_hubs"
+  modes:
+  - "BUILD"
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.4bc28207-5239-4f47-99f5-805da54d8e89"
+- alias: "ri.foundry.main.dataset.4f3670e9-107e-423c-a3fc-cc95da5ec382"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.4f3670e9-107e-423c-a3fc-cc95da5ec382"
+- alias: "ri.foundry.main.dataset.89addc0e-00be-4277-86d8-d5ba5a9f9f39"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.89addc0e-00be-4277-86d8-d5ba5a9f9f39"
+- alias: "ri.magritte..source.0049ef11-1810-4389-96bb-de55ac0f528f"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.magritte..source.0049ef11-1810-4389-96bb-de55ac0f528f"
