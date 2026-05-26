@@ -17,12 +17,11 @@ INCIDENT_SCHEMA = StructType([
     StructField("longitude", DoubleType(), True)
 ])
 
-# Re-use your existing secure network egress configuration
-@external_systems(source=Source("ri.magritte..source.0049ef11-1810-4389-96bb-de55ac0f528f"))
+# Configured to use the newly approved, dedicated TfL REST API network source
+@external_systems(source=Source("ri.magritte..source.acf9fdf5-72dd-43fa-a501-2b418215791c"))
 @transform(
     live_incidents_out=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/raw_live_incidents")
 )
-# JUST ADD ', source' AT THE END OF THE ARGUMENTS HERE:
 def fetch_tfl_live_data(ctx, live_incidents_out, source):
     """
     Ingests live traffic incidents and road hazards directly from the TfL Unified API.
