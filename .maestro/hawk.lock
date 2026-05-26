@@ -11,6 +11,8 @@ aiohappyeyeballs=2.6.2=pyhd8ed1ab_0 @ 931c1ab2
 aiohttp=3.13.5=py312h5d8c7f2_0 @ 426e1572
 aioitertools=0.13.0=pyhd8ed1ab_0 @ 2cda1526
 aiosignal=1.4.0=pyhd8ed1ab_0 @ 2cda1526
+annotated-types=0.7.0=pyhd8ed1ab_1 @ 77dc15eb
+anyio=4.13.0=pyhcf101f3_0 @ 77dc15eb
 attrs=26.1.0=pyhcf101f3_0 @ 2cda1526
 aws-c-auth=0.10.1=ha62d5e7_3 @ 8ea01637
 aws-c-cal=0.9.13=h2c9d079_1 @ 426e1572
@@ -40,16 +42,23 @@ certifi=2026.5.20=pyhd8ed1ab_0 @ 931c1ab2
 charset-normalizer=3.4.7=pyhd8ed1ab_0 @ 2cda1526
 conjure-python-client=2.12.0=pyhd8ed1ab_1 @ 2cda1526
 cpython=3.12.13=py312hd8ed1ab_0 @ 2cda1526
-data-health-api=1.1531.0=py_0 @ a0b41669
-foundry-container-sidecar-api=0.2344.0=py_0 @ a0b41669
+data-health-api=1.1535.0=py_0 @ 5a011d5e
+exceptiongroup=1.3.1=pyhd8ed1ab_0 @ 2cda1526
+external-systems=0.111.0=pyhd8ed1ab_0 @ 77dc15eb
+foundry-container-sidecar-api=0.2353.0=py_0 @ 5a011d5e
 foundry-data-sidecar-api=0.966.0=py_0 @ 586315a4
-foundry-transforms-lib-python=0.1151.0=py_0 @ a0b41669
+foundry-platform-sdk=1.88.0=pyhd8ed1ab_0 @ 931c1ab2
+foundry-transforms-lib-python=0.1155.0=py_0 @ 5a011d5e
+frozendict=2.4.7=py312h4c3975b_0 @ 8ea01637
 frozenlist=1.7.0=py312h447239a_0 @ 426e1572
 fsspec=2026.4.0=pyhd8ed1ab_0 @ 2cda1526
 gflags=2.2.2=h5888daf_1005 @ 426e1572
 glog=0.7.1=hbabe93e_0 @ 426e1572
+h11=0.16.0=pyhcf101f3_1 @ 77dc15eb
 h2=4.3.0=pyhcf101f3_0 @ 2cda1526
 hpack=4.1.0=pyhd8ed1ab_0 @ 2cda1526
+httpcore=1.0.9=pyh29332c3_0 @ 77dc15eb
+httpx=0.28.1=pyhd8ed1ab_0 @ 77dc15eb
 hyperframe=6.1.0=pyhd8ed1ab_0 @ 2cda1526
 icu=78.3=h33c6efd_0 @ 426e1572
 idna=3.15=pyhcf101f3_0 @ 931c1ab2
@@ -118,13 +127,15 @@ palantir-spark-time=3.24.0=py_0 @ 586315a4
 pandas=3.0.3=py312h8ecdadd_0 @ 8ea01637
 parsimonious=0.10.0=pyhd8ed1ab_1 @ 2cda1526
 pip=26.1.1=pyh8b19718_0 @ 2cda1526
-polars=1.40.1=pyh58ad624_1 @ 77dc15eb
-polars-runtime-32=1.40.1=py310h49dadd8_1 @ 8ea01637
+polars=1.41.0=pyh58ad624_0 @ 931c1ab2
+polars-runtime-32=1.41.0=py310h49dadd8_0 @ ad241afe
 prometheus-cpp=1.3.0=ha5d0236_0 @ 426e1572
 propcache=0.3.1=py312h178313f_0 @ 426e1572
 py4j=0.10.9.9=pyhd8ed1ab_0 @ 2cda1526
 pyarrow=24.0.0=py312h7900ff3_0 @ 426e1572
 pyarrow-core=24.0.0=py312h2054cf2_0_cpu @ 426e1572
+pydantic=2.11.10=pyh3cfb1c2_0 @ 77dc15eb
+pydantic-core=2.33.2=py312h680f630_0 @ 8ea01637
 pysocks=1.7.1=pyha55dd90_7 @ 2cda1526
 pyspark=3.5.5.28=py_0 @ 586315a4
 pyspark-src=3.5.5.28=py_0 @ 586315a4
@@ -138,19 +149,25 @@ re2=2025.11.05=h5301d42_1 @ 426e1572
 readline=8.3=h853b02a_0 @ 426e1572
 regex=2026.5.9=py312h4c3975b_0 @ 8ea01637
 requests=2.34.2=pyhcf101f3_0 @ 77dc15eb
+retrying=1.4.2=pyhe01879c_0 @ 77dc15eb
 s2n=1.7.3=hc5a330e_0 @ 8ea01637
 s3fs=2026.4.0=pyhd8ed1ab_0 @ 2cda1526
 setuptools=78.1.1=pyhff2d567_0 @ 2cda1526
 six=1.17.0=pyhe01879c_1 @ 2cda1526
 snappy=1.2.2=h03e3b7b_1 @ 426e1572
+sniffio=1.3.1=pyhd8ed1ab_2 @ 77dc15eb
 tables-api=0.1066.0=py_0 @ 586315a4
 tk=8.6.13=noxft_ha0e22de_103 @ 426e1572
 transforms=3.176.1=py_0 @ 586315a4
-transforms-container-ops-python=0.293.0=py312 @ b58216b5
+transforms-container-ops-python=0.294.0=py312 @ 738f1daa
 transforms-expectations=0.1266.0=py_0 @ a0b41669
+transforms-external-systems=0.1266.0=py_0 @ a0b41669
 transforms-preview=0.1266.0=py_0 @ a0b41669
 transforms-verbs=0.1266.0=py_0 @ a0b41669
 typeguard=4.5.2=pyhcf101f3_0 @ ef0213ca
+types-requests=2.33.0.20260518=pyhcf101f3_0 @ 77dc15eb
+typing-extensions=4.15.0=h396c80c_0 @ 2cda1526
+typing-inspection=0.4.2=pyhcf101f3_2 @ 77dc15eb
 typing_extensions=4.15.0=pyhcf101f3_0 @ 2cda1526
 tzdata=2025c=hc9c84f9_1 @ 2cda1526
 urllib3=2.7.0=pyhd8ed1ab_0 @ 77dc15eb
@@ -169,13 +186,14 @@ zstd=1.5.7=hb78ec9c_6 @ 426e1572
 2cda1526 - noarch @ conda @ ri.transforms.python.artifacts.repository
 426e1572 - linux-64 @ conda @ ri.transforms.python.artifacts.repository
 586315a4 - noarch @ tar.bz2 @ ri.transforms.python.artifacts.repository
+5a011d5e - noarch @ tar.bz2 @ ri.artifacts.repository.python-library.foundry-transforms-lib
 6c0115f0 - linux-64 @ tar.bz2 @ ri.transforms.python.artifacts.repository
+738f1daa - linux-64 @ tar.bz2 @ ri.artifacts.repository.python-library.foundry-transforms-lib
 77dc15eb - noarch @ conda @ ri.transforms-addons-bundle..artifacts.bundle
 8ea01637 - linux-64 @ conda @ ri.transforms-addons-bundle..artifacts.bundle
 931c1ab2 - noarch @ conda @ ri.artifacts.repository.artifactory.external-conda-forge
 a0b41669 - noarch @ tar.bz2 @ ri.transforms-addons-bundle..artifacts.bundle
 ad241afe - linux-64 @ conda @ ri.artifacts.repository.artifactory.external-conda-forge
-b58216b5 - linux-64 @ tar.bz2 @ ri.transforms-addons-bundle..artifacts.bundle
 ef0213ca - noarch @ conda @ ri.transforms.python.artifacts.runtime
 
 [pip-indices]
@@ -189,4 +207,4 @@ ri.transforms.python.artifacts.runtime
 ri.stemma.main.repository.c37e68e3-9f1f-4b0a-aecf-c326f008782a
 
 [conda lock version]
-v3 - d63b0876fec4e043a2f4d70f387f42d6b179db757e95c46c60fd2daf50f99eed
+v3 - 59872791a2b187832be2257da0c0f5deb179db757e95c46c60fd2daf50f99eed
