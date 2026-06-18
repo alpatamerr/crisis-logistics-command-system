@@ -1,9 +1,10 @@
 from transforms.api import transform, Output
-from transforms.external.systems import external_systems, Source
+from transforms.external.systems import external_systems, Source, ResolvedSource
 from pyspark.sql import Row
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from datetime import datetime, timezone
 import requests
+from requests.auth import HTTPBasicAuth
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,17 +24,28 @@ AIRCRAFT_SCHEMA = StructType([
 @transform(
     aircraft_telemetry_out=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/datasets/opensky_processor")
 )
-def compute(ctx, aircraft_telemetry_out, source):
+def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
     """
     Ingests live aircraft telemetry from the OpenSky Network API.
     Parses the nested JSON array structure into a standardized tabular Spark DataFrame.
+    Filters out records with invalid geolocation data.
     """
     url = "https://opensky-network.org/api/states/all"
     spark_session = ctx.spark_session
     
+    # Retrieve authentication credentials from the external source
+    client_id = source.get_secret("clientId")
+    client_secret = source.get_secret("clientSecret")
+    
     try:
         logger.info("Initiating live aircraft telemetry pull from OpenSky Network API...")
-        response = requests.get(url, timeout=15)
+        
+        # Use Basic Authentication with your credentials
+        response = requests.get(
+            url, 
+            auth=HTTPBasicAuth(client_id, client_secret),
+            timeout=15
+        )
         response.raise_for_status()
         data = response.json()
         
