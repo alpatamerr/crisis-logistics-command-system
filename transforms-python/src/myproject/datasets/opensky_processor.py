@@ -18,27 +18,21 @@ AIRCRAFT_SCHEMA = StructType([
     StructField("timestamp", StringType(), True)
 ])
 
-# Configure to use approved OpenSky Network API source credentials
 @external_systems(source=Source("ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"))
 @transform(
     aircraft_telemetry_out=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/datasets/opensky_processor")
 )
 def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
-    """
-    Ingests live aircraft telemetry from the OpenSky Network API using OAuth2.
-    Parses the nested JSON array structure into a standardized tabular Spark DataFrame.
-    Filters out records with invalid geolocation data.
-    """
     spark_session = ctx.spark_session
     
-    # Retrieve OAuth2 credentials from the external source
+    # Retrieve OAuth2 credentials from Foundry Data Connection
     client_id = source.get_secret("additionalSecretOauthClientId")
     client_secret = source.get_secret("additionalSecretOauthClientSecret")
     
     try:
-        # Step 1: Obtain OAuth2 access token
-        logger.info("Requesting OAuth2 access token from OpenSky Network...")
-        token_url = "https://opensky-network.org/api/oauth/token"
+        # Step 1: Obtain OAuth2 access token via OpenID Connect
+        token_url = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
+        
         token_response = requests.post(
             token_url,
             data={
@@ -46,22 +40,17 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
                 "client_id": client_id,
                 "client_secret": client_secret
             },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
             timeout=15
         )
-
-        # ADD THIS DEBUG LOG:
+        
         if token_response.status_code != 200:
             logger.error(f"Auth failed! Status: {token_response.status_code}, Response: {token_response.text}")
             token_response.raise_for_status()
             
         access_token = token_response.json()["access_token"]
-
-        token_response.raise_for_status()
-        access_token = token_response.json()["access_token"]
-        logger.info("Successfully obtained OAuth2 access token.")
         
-        # Step 2: Fetch aircraft telemetry using the access token
-        logger.info("Initiating live aircraft telemetry pull from OpenSky Network API...")
+        # Step 2: Fetch aircraft telemetry using the Bearer token
         url = "https://opensky-network.org/api/states/all"
         response = requests.get(
             url,
@@ -70,75 +59,32 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
         )
         response.raise_for_status()
         data = response.json()
-        
-        # OpenSky API returns data in format: {"time": timestamp, "states": [[array of values]]}
         states = data.get("states", [])
         
-        if not states:
-            logger.warn("OpenSky API returned an empty states payload.")
-            empty_df = spark_session.createDataFrame([], AIRCRAFT_SCHEMA)
-            aircraft_telemetry_out.write_dataframe(empty_df)
-            return
-            
-        logger.info(f"Successfully retrieved {len(states)} active aircraft tracks.")
-        
-        # DEBUG: Log the first raw state to verify array structure
-        logger.info(f"Sample raw state: {states[0]}")
-        logger.info(f"Sample state length: {len(states[0])}")
-        
     except Exception as e:
-        logger.error(f"Critical network failure hitting OpenSky Network API: {str(e)}")
-        # Graceful Fail-Safe: Write an empty dataframe matching schema to prevent breaking downstream builds
-        empty_df = spark_session.createDataFrame([], AIRCRAFT_SCHEMA)
-        aircraft_telemetry_out.write_dataframe(empty_df)
+        logger.error(f"Critical failure hitting OpenSky Network: {str(e)}")
+        # Graceful Fail-Safe
+        aircraft_telemetry_out.write_dataframe(spark_session.createDataFrame([], AIRCRAFT_SCHEMA))
         return
 
+    # Process records
     parsed_records = []
     current_time = datetime.now(timezone.utc).isoformat(timespec='seconds')
     
-    # OpenSky API states array format (indices):
-    # [0]=icao24, [1]=callsign, [2]=origin_country, [3]=time_position, [4]=last_contact,
-    # [5]=longitude, [6]=latitude, [7]=baro_altitude, [8]=on_ground, [9]=velocity, [10]=true_track,
-    # [11]=vertical_rate, [12]=sensors, [13]=geo_altitude, [14]=squawk, [15]=spi, [16]=position_source
-    
     for state in states:
-        # Extract fields defensively to avoid index errors
-        if len(state) < 7:
-            logger.warn(f"Skipping state with insufficient length: {len(state)}")
-            continue
+        if len(state) < 7: continue
             
-        icao24 = state[0]  # Unique aircraft identifier
-        latitude = state[6]
-        longitude = state[5]
-        on_ground = state[8] if len(state) > 8 else None
+        icao24, lon, lat, on_ground = state[0], state[5], state[6], state[8]
         
-        # Determine operational status
-        if on_ground is True:
-            status = "GROUNDED"
-        elif on_ground is False:
-            status = "AIRBORNE"
-        else:
-            status = "UNKNOWN"
-        
-        # TEMPORARILY REMOVED: null coordinate filter for debugging
-        # if latitude is None or longitude is None:
-        #     continue
-            
         parsed_records.append(Row(
             unit_id=str(icao24) if icao24 else None,
             vehicle_type="AIRCRAFT",
-            latitude=float(latitude) if latitude is not None else None,
-            longitude=float(longitude) if longitude is not None else None,
-            status=status,
+            latitude=float(lat) if lat is not None else None,
+            longitude=float(lon) if lon is not None else None,
+            status="GROUNDED" if on_ground is True else ("AIRBORNE" if on_ground is False else "UNKNOWN"),
             timestamp=current_time
         ))
     
-    # Construct final Spark DataFrame
-    if parsed_records:
-        output_df = spark_session.createDataFrame(parsed_records, AIRCRAFT_SCHEMA)
-        logger.info(f"Successfully processed {len(parsed_records)} aircraft records (including null coordinates).")
-    else:
-        logger.warn("No valid aircraft records found after parsing.")
-        output_df = spark_session.createDataFrame([], AIRCRAFT_SCHEMA)
-    
+    # Final write
+    output_df = spark_session.createDataFrame(parsed_records, AIRCRAFT_SCHEMA) if parsed_records else spark_session.createDataFrame([], AIRCRAFT_SCHEMA)
     aircraft_telemetry_out.write_dataframe(output_df)
