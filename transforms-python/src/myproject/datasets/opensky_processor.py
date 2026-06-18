@@ -48,6 +48,14 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
             },
             timeout=15
         )
+
+        # ADD THIS DEBUG LOG:
+        if token_response.status_code != 200:
+            logger.error(f"Auth failed! Status: {token_response.status_code}, Response: {token_response.text}")
+            token_response.raise_for_status()
+            
+        access_token = token_response.json()["access_token"]
+
         token_response.raise_for_status()
         access_token = token_response.json()["access_token"]
         logger.info("Successfully obtained OAuth2 access token.")
