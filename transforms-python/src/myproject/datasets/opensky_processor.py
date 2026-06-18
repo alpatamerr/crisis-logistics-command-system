@@ -27,7 +27,6 @@ def compute(ctx, aircraft_telemetry_out, source):
     """
     Ingests live aircraft telemetry from the OpenSky Network API.
     Parses the nested JSON array structure into a standardized tabular Spark DataFrame.
-    Filters out records with invalid geolocation data.
     """
     url = "https://opensky-network.org/api/states/all"
     spark_session = ctx.spark_session
@@ -49,6 +48,10 @@ def compute(ctx, aircraft_telemetry_out, source):
             
         logger.info(f"Successfully retrieved {len(states)} active aircraft tracks.")
         
+        # DEBUG: Log the first raw state to verify array structure
+        logger.info(f"Sample raw state: {states[0]}")
+        logger.info(f"Sample state length: {len(states[0])}")
+        
     except Exception as e:
         logger.error(f"Critical network failure hitting OpenSky Network API: {str(e)}")
         # Graceful Fail-Safe: Write an empty dataframe matching schema to prevent breaking downstream builds
@@ -67,6 +70,7 @@ def compute(ctx, aircraft_telemetry_out, source):
     for state in states:
         # Extract fields defensively to avoid index errors
         if len(state) < 7:
+            logger.warn(f"Skipping state with insufficient length: {len(state)}")
             continue
             
         icao24 = state[0]  # Unique aircraft identifier
@@ -82,15 +86,15 @@ def compute(ctx, aircraft_telemetry_out, source):
         else:
             status = "UNKNOWN"
         
-        # Apply null coordinate filter - skip records with invalid geolocation
-        if latitude is None or longitude is None:
-            continue
+        # TEMPORARILY REMOVED: null coordinate filter for debugging
+        # if latitude is None or longitude is None:
+        #     continue
             
         parsed_records.append(Row(
             unit_id=str(icao24) if icao24 else None,
             vehicle_type="AIRCRAFT",
-            latitude=float(latitude),
-            longitude=float(longitude),
+            latitude=float(latitude) if latitude is not None else None,
+            longitude=float(longitude) if longitude is not None else None,
             status=status,
             timestamp=current_time
         ))
@@ -98,9 +102,9 @@ def compute(ctx, aircraft_telemetry_out, source):
     # Construct final Spark DataFrame
     if parsed_records:
         output_df = spark_session.createDataFrame(parsed_records, AIRCRAFT_SCHEMA)
-        logger.info(f"Successfully processed {len(parsed_records)} aircraft records with valid coordinates.")
+        logger.info(f"Successfully processed {len(parsed_records)} aircraft records (including null coordinates).")
     else:
-        logger.warn("No valid aircraft records found after filtering null coordinates.")
+        logger.warn("No aircraft records found after parsing.")
         output_df = spark_session.createDataFrame([], AIRCRAFT_SCHEMA)
     
     aircraft_telemetry_out.write_dataframe(output_df)
