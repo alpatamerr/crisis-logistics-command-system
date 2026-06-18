@@ -4,7 +4,6 @@ from pyspark.sql import Row
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from datetime import datetime, timezone
 import requests
-from requests.auth import HTTPBasicAuth
 import logging
 
 logger = logging.getLogger(__name__)
@@ -26,24 +25,39 @@ AIRCRAFT_SCHEMA = StructType([
 )
 def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
     """
-    Ingests live aircraft telemetry from the OpenSky Network API.
+    Ingests live aircraft telemetry from the OpenSky Network API using OAuth2.
     Parses the nested JSON array structure into a standardized tabular Spark DataFrame.
     Filters out records with invalid geolocation data.
     """
-    url = "https://opensky-network.org/api/states/all"
     spark_session = ctx.spark_session
     
-    # Retrieve authentication credentials from the external source
-    client_id = source.get_secret("clientId")
-    client_secret = source.get_secret("clientSecret")
+    # Retrieve OAuth2 credentials from the external source
+    client_id = source.get_secret("OauthClientId")
+    client_secret = source.get_secret("OauthClientSecret")
     
     try:
-        logger.info("Initiating live aircraft telemetry pull from OpenSky Network API...")
+        # Step 1: Obtain OAuth2 access token
+        logger.info("Requesting OAuth2 access token from OpenSky Network...")
+        token_url = "https://opensky-network.org/api/oauth/token"
+        token_response = requests.post(
+            token_url,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret
+            },
+            timeout=15
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json()["access_token"]
+        logger.info("Successfully obtained OAuth2 access token.")
         
-        # Use Basic Authentication with your credentials
+        # Step 2: Fetch aircraft telemetry using the access token
+        logger.info("Initiating live aircraft telemetry pull from OpenSky Network API...")
+        url = "https://opensky-network.org/api/states/all"
         response = requests.get(
-            url, 
-            auth=HTTPBasicAuth(client_id, client_secret),
+            url,
+            headers={"Authorization": f"Bearer {access_token}"},
             timeout=15
         )
         response.raise_for_status()
