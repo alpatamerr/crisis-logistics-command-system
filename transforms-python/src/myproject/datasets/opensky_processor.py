@@ -32,8 +32,8 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
     spark_session = ctx.spark_session
     
     # Retrieve OAuth2 credentials from the external source
-    client_id = source.get_secret("OauthClientId")
-    client_secret = source.get_secret("OauthClientSecret")
+    client_id = source.get_secret("additionalSecretOauthClientId")
+    client_secret = source.get_secret("additionalSecretOauthClientSecret")
     
     try:
         # Step 1: Obtain OAuth2 access token
@@ -130,7 +130,7 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
         output_df = spark_session.createDataFrame(parsed_records, AIRCRAFT_SCHEMA)
         logger.info(f"Successfully processed {len(parsed_records)} aircraft records (including null coordinates).")
     else:
-        logger.warn("No aircraft records found after parsing.")
+        logger.warn("No valid aircraft records found after parsing.")
         output_df = spark_session.createDataFrame([], AIRCRAFT_SCHEMA)
     
     aircraft_telemetry_out.write_dataframe(output_df)
