@@ -59,6 +59,9 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
         )
         response.raise_for_status()
         data = response.json()
+        logger.info(f"DEBUG: Response keys: {list(data.keys())}")
+        states = data.get("states", [])
+        logger.info(f"DEBUG: 'states' found: {states is not None}, count: {len(states) if states else 0}")
         states = data.get("states", [])
         
     except Exception as e:
