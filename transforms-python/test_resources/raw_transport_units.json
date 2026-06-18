@@ -498,5 +498,5 @@
     {"unit_id": "TX-1001", "latitude": 51.54822, "longitude": -0.13909, "status": "EN_ROUTE", "timestamp": "2026-05-26T20:55:43+00:00"},
     {"unit_id": "TX-1002", "latitude": 51.52677, "longitude": -0.09206, "status": "EN_ROUTE", "timestamp": "2026-05-26T20:55:43+00:00"},
     {"unit_id": "TX-1003", "latitude": 51.4349, "longitude": -0.06477, "status": "EN_ROUTE", "timestamp": "2026-05-26T20:55:43+00:00"},
-    {"unit_id": "TX-1004", "latitude": 51.4691, "longitude": -0.45099, "status": "EN_ROUTE", "timestamp": "2026-05-26T20:55:43+00:00"},
+    {"unit_id": "TX-1004", "latitude": 51.4691, "longitude": -0.45099, "status": "EN_ROUTE", "timestamp": "2026-05-26T20:55:43+00:00"}
 ]
