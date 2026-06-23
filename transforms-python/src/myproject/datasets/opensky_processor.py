@@ -14,6 +14,8 @@ AIRCRAFT_SCHEMA = StructType([
     StructField("timestamp",     StringType(), True),
 ])
 
+BBOX = dict(lamin=51.43, lomin=-0.52, lamax=51.55, lomax=-0.10)
+
 
 def _write_row(spark, output, unit_id, vehicle_type, lat, lon, status, timestamp):
     output.write_dataframe(
@@ -39,11 +41,8 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
     current_time = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     try:
-        # Dump ALL environment variables — looking for proxy, sidecar, or
-        # magritte-related vars that tell us how to route outbound HTTP
         all_env = dict(os.environ)
-        
-        # Filter to anything plausibly relevant
+
         interesting = {
             k: v for k, v in all_env.items()
             if any(word in k.upper() for word in [
@@ -53,9 +52,25 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
             ])
         }
 
-        _write_row(spark, aircraft_telemetry_out,
-                   "DEBUG", "INFO", 0.0, 0.0,
-                   str(interesting)[:250], current_time)
+        # Write one row per env var so nothing gets truncated
+        rows = []
+        for k, v in sorted(interesting.items()):
+            rows.append(Row(
+                unit_id      = k,
+                vehicle_type = "ENV",
+                latitude     = 0.0,
+                longitude    = 0.0,
+                status       = str(v)[:250],
+                timestamp    = current_time,
+            ))
+
+        if rows:
+            aircraft_telemetry_out.write_dataframe(
+                spark.createDataFrame(rows, AIRCRAFT_SCHEMA)
+            )
+        else:
+            _write_row(spark, aircraft_telemetry_out,
+                       "NO_ENV", "INFO", 0.0, 0.0, "No matching env vars found", current_time)
 
     except Exception as e:
         _write_row(spark, aircraft_telemetry_out,
