@@ -41,6 +41,11 @@ mappings:
   - "READ"
   path: "/deprecated-field"
   rid: "ri.magritte..source.0049ef11-1810-4389-96bb-de55ac0f528f"
+- alias: "ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"
 - alias: "ri.magritte..source.acf9fdf5-72dd-43fa-a501-2b418215791c"
   modes:
   - "READ"
