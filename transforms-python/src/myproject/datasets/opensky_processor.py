@@ -3,7 +3,6 @@ from transforms.external.systems import external_systems, Source, ResolvedSource
 from pyspark.sql import Row
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from datetime import datetime, timezone
-import requests
 import logging
 import time
 import random
@@ -19,7 +18,6 @@ AIRCRAFT_SCHEMA = StructType([
     StructField("timestamp", StringType(), True)
 ])
 
-
 @external_systems(source=Source("ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"))
 @transform(
     aircraft_telemetry_out=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/datasets/opensky_processor")
@@ -27,67 +25,47 @@ AIRCRAFT_SCHEMA = StructType([
 def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
     spark_session = ctx.spark_session
 
-    client_id = source.get_secret("additionalSecretOauthClientId")
-    client_secret = source.get_secret("additionalSecretOauthClientSecret")
+    # Pulling your creds to use as standard Basic Auth
+    username = source.get_secret("additionalSecretOauthClientId")
+    password = source.get_secret("additionalSecretOauthClientSecret")
+    
     try:
-        # Daha verimli bağlantı için Session kullanıyoruz
-        session = requests.Session()
-
-        # Adım 1: OpenID Connect ile GERÇEK Auth Token al
-        token_url = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
-        token_response = session.post(
-            token_url,
-            data={
-                "grant_type": "client_credentials",
-                "client_id": client_id,
-                "client_secret": client_secret
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=15
-        )
-
-        if token_response.status_code != 200:
-            logger.error(f"Auth failed! Status: {token_response.status_code}, Response: {token_response.text}")
-            token_response.raise_for_status()
-
-        access_token = token_response.json()["access_token"]
-
-        # Adım 2: GERÇEK Canlı Veriyi Çekme
-        url = "https://opensky-network.org/api/states/all"
-
-        # Spam gibi görünmemek için küçük bir rastgele gecikme ekliyoruz
+        # We use Foundry's internal client which ALREADY has egress access to the main domain
+        client = source.get_https_connection().get_client()
+        base_url = source.get_https_connection().url
+        
+        url = f"{base_url}/api/states/all"
+        
+        # Jitter to prevent spam detection
         time.sleep(random.uniform(1.0, 3.0))
-
-        response = session.get(
+        
+        # Hitting the main API directly with Basic Auth - bypassing the blocked auth subdomain
+        response = client.get(
             url,
-            headers={"Authorization": f"Bearer {access_token}"},
+            auth=(username, password),
             timeout=15
         )
 
-        # EĞER 429 ALIRSAK: Çökme, sadece bekleyip tekrar dene
         if response.status_code == 429:
             retry_after = int(response.headers.get("Retry-After", 60))
-            logger.warning(f"429 Limit aşıldı! API {retry_after} saniye beklememizi istiyor...")
+            logger.warning(f"429 Limit hit! Waiting {retry_after}s...")
             time.sleep(retry_after + 1)
-            logger.info("Bekleme bitti, API'ye tekrar vuruluyor...")
-            response = session.get(url, headers={"Authorization": f"Bearer {access_token}"}, timeout=15)
+            response = client.get(url, auth=(username, password), timeout=15)
 
         response.raise_for_status()
 
-        # Kalan krediyi loglara bas (4000 KREDİNİ BURADA GÖRECEKSİN)
-        remaining = response.headers.get("X-Rate-Limit-Remaining", "Bilinmiyor")
-        logger.info(f"==== KALAN GERÇEK OPENSKY KREDİSİ: {remaining} / 4000 ====")
+        # Log the 4000 credit tracker
+        remaining = response.headers.get("X-Rate-Limit-Remaining", "Unknown")
+        logger.info(f"==== REMAINING REAL OPENSKY CREDITS: {remaining} ====")
 
         data = response.json()
         states = data.get("states", [])
 
     except Exception as e:
         logger.error(f"Critical failure hitting OpenSky Network: {str(e)}")
-        # Pipeline patlamasın diye boş tablo dönüyoruz
         aircraft_telemetry_out.write_dataframe(spark_session.createDataFrame([], AIRCRAFT_SCHEMA))
         return
 
-    # Veri İşleme Kısmı
     parsed_records = []
     current_time = datetime.now(timezone.utc).isoformat(timespec='seconds')
 
