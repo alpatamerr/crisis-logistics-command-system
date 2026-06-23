@@ -3,7 +3,6 @@ from transforms.external.systems import external_systems, Source, ResolvedSource
 from pyspark.sql import Row
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from datetime import datetime, timezone
-import requests
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,30 +16,19 @@ AIRCRAFT_SCHEMA = StructType([
     StructField("timestamp", StringType(), True)
 ])
 
-# Keep @external_systems - this is what gives the transform network access
-# through Foundry's egress proxy. Without it, DNS resolution fails entirely.
 @external_systems(source=Source("ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"))
 @transform(
     aircraft_telemetry_out=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/datasets/opensky_processor")
 )
 def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
-    """
-    Ingests live aircraft telemetry from OpenSky Network API.
-    Uses anonymous access (400 credits/day) via the Data Connection
-    egress proxy for network routing.
-    Auth endpoint (auth.opensky-network.org) is not called - anonymous only.
-    """
     spark_session = ctx.spark_session
 
     try:
-        session = requests.Session()
-        session.headers.update({"User-Agent": "Foundry-OpenSky-Integration/1.0"})
+        client = source.get_https_connection().get_client()
+        base_url = source.get_https_connection().url
 
-        api_url = "https://opensky-network.org/api/states/all"
-        logger.info("Fetching aircraft state vectors (anonymous access via egress proxy)...")
-
-        response = session.get(
-            api_url,
+        response = client.get(
+            base_url + "/api/states/all",
             timeout=(15, 45)
         )
 
@@ -69,29 +57,13 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
 
         logger.info(f"Retrieved {len(states)} aircraft state vectors")
 
-    except requests.exceptions.Timeout as e:
-        logger.error(f"Request timed out: {str(e)}")
-        aircraft_telemetry_out.write_dataframe(
-            spark_session.createDataFrame([], AIRCRAFT_SCHEMA)
-        )
-        return
-    except requests.exceptions.ConnectionError as e:
-        logger.error(
-            f"Connection error - check that opensky-network.org is whitelisted "
-            f"in the Data Connection egress policy: {str(e)}"
-        )
-        aircraft_telemetry_out.write_dataframe(
-            spark_session.createDataFrame([], AIRCRAFT_SCHEMA)
-        )
-        return
     except Exception as e:
-        logger.error(f"Unexpected error: {type(e).__name__}: {str(e)}")
+        logger.error(f"Connection failed: {type(e).__name__}: {str(e)}")
         aircraft_telemetry_out.write_dataframe(
             spark_session.createDataFrame([], AIRCRAFT_SCHEMA)
         )
         return
 
-    # Parse state vectors
     parsed_records = []
     current_time = datetime.now(timezone.utc).isoformat(timespec='seconds')
 
