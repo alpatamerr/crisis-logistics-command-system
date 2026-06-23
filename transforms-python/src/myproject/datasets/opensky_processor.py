@@ -3,6 +3,8 @@ from transforms.external.systems import external_systems, Source, ResolvedSource
 from pyspark.sql import Row
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from datetime import datetime, timezone
+import requests
+import os
 import time
 import random
 
@@ -21,36 +23,39 @@ AIRCRAFT_SCHEMA = StructType([
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-TOKEN_PATH = "/auth/realms/opensky-network/protocol/openid-connect/token"
+TOKEN_URL = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
+API_URL   = "https://opensky-network.org/api/states/all"
 
 # West London bounding box (~10 sq° = 1 credit per call)
-# Covers: Heathrow, Ealing, Hammersmith, Fulham, Chelsea, Kensington
 BBOX = dict(lamin=51.43, lomin=-0.52, lamax=51.55, lomax=-0.10)
 
-TOKEN_TIMEOUT = 10  # seconds
-API_TIMEOUT   = 15  # seconds
+TOKEN_TIMEOUT = 10
+API_TIMEOUT   = 15
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _get_bearer_token(source: ResolvedSource, client_id: str, client_secret: str) -> str:
+def _make_session() -> requests.Session:
     """
-    Fetch OAuth2 token via Foundry's managed connection to auth.opensky-network.org.
-    We use a second source connection so egress is routed correctly.
+    Build a requests Session that honours Foundry's egress proxy.
+    Foundry sets HTTPS_PROXY / HTTP_PROXY env vars on the worker —
+    using a Session with trust_env=True picks these up automatically,
+    routing traffic through the approved egress policies.
     """
-    conn   = source.get_https_connection("auth.opensky-network.org")
-    client = conn.get_client()
-    client.hooks = {}  # clear any retry/hook behaviour
+    session = requests.Session()
+    session.trust_env = True   # picks up HTTPS_PROXY from Foundry worker env
+    return session
 
-    resp = client.post(
-        conn.url.rstrip("/") + TOKEN_PATH,
+
+def _get_bearer_token(session: requests.Session, client_id: str, client_secret: str) -> str:
+    resp = session.post(
+        TOKEN_URL,
         data={
             "grant_type":    "client_credentials",
             "client_id":     client_id,
             "client_secret": client_secret,
         },
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
         timeout=TOKEN_TIMEOUT,
     )
     resp.raise_for_status()
@@ -116,21 +121,22 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
         client_secret = source.get_secret("additionalSecretOauthClientSecret")
 
         # ------------------------------------------------------------------
-        # 2. Fetch Bearer token through Foundry egress
+        # 2. Build session — routes through Foundry's egress proxy
         # ------------------------------------------------------------------
-        token = _get_bearer_token(source, client_id, client_secret)
+        session = _make_session()
 
         # ------------------------------------------------------------------
-        # 3. Call OpenSky API through Foundry egress
+        # 3. Fetch Bearer token
+        # ------------------------------------------------------------------
+        token = _get_bearer_token(session, client_id, client_secret)
+
+        # ------------------------------------------------------------------
+        # 4. Call OpenSky API
         # ------------------------------------------------------------------
         time.sleep(random.uniform(0.5, 1.5))
 
-        conn   = source.get_https_connection()
-        client = conn.get_client()
-        client.hooks = {}  # suppress any internal retry loops
-
-        response = client.get(
-            conn.url.rstrip("/") + "/api/states/all",
+        response = session.get(
+            API_URL,
             params={
                 "lamin": BBOX["lamin"],
                 "lomin": BBOX["lomin"],
@@ -143,13 +149,13 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
         response.raise_for_status()
 
         # ------------------------------------------------------------------
-        # 4. Parse
+        # 5. Parse
         # ------------------------------------------------------------------
         states = response.json().get("states") or []
         parsed_rows = [r for r in (_parse_state(s, current_time) for s in states) if r]
 
         # ------------------------------------------------------------------
-        # 5. Write
+        # 6. Write
         # ------------------------------------------------------------------
         if parsed_rows:
             output_df = spark.createDataFrame(parsed_rows, AIRCRAFT_SCHEMA)
@@ -168,9 +174,23 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
 
         aircraft_telemetry_out.write_dataframe(output_df)
 
+    except requests.Timeout:
+        _write_error(spark, aircraft_telemetry_out,
+                     f"TIMEOUT — no response within {API_TIMEOUT}s. Check egress proxy.",
+                     current_time)
+
+    except requests.ConnectionError as e:
+        _write_error(spark, aircraft_telemetry_out,
+                     f"ConnectionError — egress proxy may not be set: {str(e)[:180]}",
+                     current_time)
+
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else "???"
+        _write_error(spark, aircraft_telemetry_out,
+                     f"HTTP {code}: {str(e)[:200]}",
+                     current_time)
+
     except Exception as e:
-        _write_error(
-            spark, aircraft_telemetry_out,
-            f"{type(e).__name__}: {str(e)[:220]}",
-            current_time,
-        )
+        _write_error(spark, aircraft_telemetry_out,
+                     f"{type(e).__name__}: {str(e)[:220]}",
+                     current_time)
