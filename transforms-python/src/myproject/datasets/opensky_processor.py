@@ -3,8 +3,6 @@ from transforms.external.systems import external_systems, Source, ResolvedSource
 from pyspark.sql import Row
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from datetime import datetime, timezone
-import time
-import random
 
 AIRCRAFT_SCHEMA = StructType([
     StructField("unit_id",       StringType(), True),
@@ -16,9 +14,6 @@ AIRCRAFT_SCHEMA = StructType([
 ])
 
 BBOX = dict(lamin=51.43, lomin=-0.52, lamax=51.55, lomax=-0.10)
-
-TOKEN_PATH = "/auth/realms/opensky-network/protocol/openid-connect/token"
-API_PATH   = "/api/states/all"
 
 
 def _write_row(spark, output, unit_id, vehicle_type, lat, lon, status, timestamp):
@@ -45,24 +40,18 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
     current_time = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     try:
-        client_id     = source.get_secret("additionalSecretOauthClientId")
-        client_secret = source.get_secret("additionalSecretOauthClientSecret")
-
-        # ------------------------------------------------------------------
-        # STEP 1: Inspect what the source connection actually exposes
-        # ------------------------------------------------------------------
-        conn = source.get_https_connection()
-        base_url = conn.url.rstrip("/")
-
-        debug = (
-            f"base_url={base_url} | "
-            f"conn_type={type(conn).__name__} | "
-            f"conn_attrs={[a for a in dir(conn) if not a.startswith('_')]} | "
-        )
-
+        conn   = source.get_https_connection()
         client = conn.get_client()
-        client_attrs = [a for a in dir(client) if not a.startswith('_')]
-        debug += f"client_type={type(client).__name__} | client_attrs={client_attrs}"
+
+        # Inspect what headers and query_params the connection pre-populates
+        # (Foundry may inject the Bearer token here automatically)
+        debug = (
+            f"headers={dict(conn.headers)} | "
+            f"query_params={dict(conn.query_params)} | "
+            f"session_headers={dict(client.headers)} | "
+            f"session_auth={client.auth} | "
+            f"session_proxies={client.proxies}"
+        )
 
         _write_row(spark, aircraft_telemetry_out,
                    "DEBUG", "INFO", 0.0, 0.0, debug[:250], current_time)
