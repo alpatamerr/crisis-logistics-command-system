@@ -3,6 +3,7 @@ from transforms.external.systems import external_systems, Source, ResolvedSource
 from pyspark.sql import Row
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from datetime import datetime, timezone
+import requests
 import time
 import random
 
@@ -19,11 +20,38 @@ AIRCRAFT_SCHEMA = StructType([
 ])
 
 # ---------------------------------------------------------------------------
-# West London bounding box
-# Covers: Heathrow, Hayes, Southall, Ealing, Hammersmith, Fulham, Chelsea, Kensington
-# Area: ~10 sq° → 1 credit per call
+# Constants
 # ---------------------------------------------------------------------------
+TOKEN_URL = (
+    "https://auth.opensky-network.org"
+    "/auth/realms/opensky-network/protocol/openid-connect/token"
+)
+API_URL = "https://opensky-network.org/api/states/all"
+
+# West London bounding box (~10 sq° = 1 credit per call)
+# Covers: Heathrow, Hayes, Southall, Ealing, Hammersmith, Fulham, Chelsea, Kensington
 BBOX = dict(lamin=51.43, lomin=-0.52, lamax=51.55, lomax=-0.10)
+
+# Tight timeouts — fail fast rather than hang
+TOKEN_TIMEOUT = 10   # seconds
+API_TIMEOUT   = 15   # seconds
+
+
+# ---------------------------------------------------------------------------
+# Helper: fetch OAuth2 Bearer token
+# ---------------------------------------------------------------------------
+def _get_bearer_token(client_id: str, client_secret: str) -> str:
+    resp = requests.post(
+        TOKEN_URL,
+        data={
+            "grant_type":    "client_credentials",
+            "client_id":     client_id,
+            "client_secret": client_secret,
+        },
+        timeout=TOKEN_TIMEOUT,
+    )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +84,25 @@ def _parse_state(state: list, timestamp: str):
 
 
 # ---------------------------------------------------------------------------
+# Helper: write error row
+# ---------------------------------------------------------------------------
+def _write_error(spark, output, message: str, timestamp: str):
+    output.write_dataframe(
+        spark.createDataFrame(
+            [Row(
+                unit_id      = "SYS_FAIL",
+                vehicle_type = "ERROR",
+                latitude     = 0.0,
+                longitude    = 0.0,
+                status       = message[:250],
+                timestamp    = timestamp,
+            )],
+            AIRCRAFT_SCHEMA,
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
 # Transform
 # ---------------------------------------------------------------------------
 @external_systems(
@@ -72,38 +119,39 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
 
     try:
         # ------------------------------------------------------------------
-        # 1. Get the HTTP client from Foundry's managed connection.
-        #    Because the source is configured as OAuth 2.0 in the Source
-        #    Setup UI, Foundry automatically injects a valid Bearer token
-        #    into every request made through this client. No manual token
-        #    fetching is needed or wanted here.
+        # 1. Pull credentials from Foundry secrets
         # ------------------------------------------------------------------
-        conn   = source.get_https_connection()
-        client = conn.get_client()
+        client_id     = source.get_secret("additionalSecretOauthClientId")
+        client_secret = source.get_secret("additionalSecretOauthClientSecret")
 
-        base_url = conn.url.rstrip("/")
-        url = (
-            f"{base_url}/api/states/all"
-            f"?lamin={BBOX['lamin']}"
-            f"&lomin={BBOX['lomin']}"
-            f"&lamax={BBOX['lamax']}"
-            f"&lomax={BBOX['lomax']}"
+        # ------------------------------------------------------------------
+        # 2. Get Bearer token — fast timeout so we fail in <10s if blocked
+        # ------------------------------------------------------------------
+        token = _get_bearer_token(client_id, client_secret)
+
+        # ------------------------------------------------------------------
+        # 3. Call OpenSky directly with raw requests (not Foundry's client)
+        #    so that our timeout is actually respected
+        # ------------------------------------------------------------------
+        time.sleep(random.uniform(0.5, 1.5))
+
+        response = requests.get(
+            API_URL,
+            params={
+                "lamin": BBOX["lamin"],
+                "lomin": BBOX["lomin"],
+                "lamax": BBOX["lamax"],
+                "lomax": BBOX["lomax"],
+            },
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=API_TIMEOUT,   # (connect_timeout, read_timeout) can also be a tuple
         )
-
-        # Polite random back-off to avoid hammering the API
-        time.sleep(random.uniform(1.0, 2.0))
-
-        # ------------------------------------------------------------------
-        # 2. Make the request — Foundry injects the Bearer token for us
-        # ------------------------------------------------------------------
-        response = client.get(url, timeout=30)
         response.raise_for_status()
 
         # ------------------------------------------------------------------
-        # 3. Parse the response
+        # 4. Parse
         # ------------------------------------------------------------------
-        data   = response.json()
-        states = data.get("states") or []
+        states = response.json().get("states") or []
 
         parsed_rows = []
         for state in states:
@@ -112,7 +160,7 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
                 parsed_rows.append(row)
 
         # ------------------------------------------------------------------
-        # 4. Write output DataFrame
+        # 5. Write
         # ------------------------------------------------------------------
         if parsed_rows:
             output_df = spark.createDataFrame(parsed_rows, AIRCRAFT_SCHEMA)
@@ -123,7 +171,7 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
                     vehicle_type = "INFO",
                     latitude     = 0.0,
                     longitude    = 0.0,
-                    status       = "API connected — no aircraft in West London bbox right now",
+                    status       = "API OK — no aircraft in West London bbox right now",
                     timestamp    = current_time,
                 )],
                 AIRCRAFT_SCHEMA,
@@ -131,27 +179,19 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
 
         aircraft_telemetry_out.write_dataframe(output_df)
 
+    except requests.Timeout as e:
+        _write_error(spark, aircraft_telemetry_out,
+                     f"TIMEOUT after {API_TIMEOUT}s: {str(e)[:180]}", current_time)
+
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else "???"
+        _write_error(spark, aircraft_telemetry_out,
+                     f"HTTP {code}: {str(e)[:200]}", current_time)
+
+    except requests.ConnectionError as e:
+        _write_error(spark, aircraft_telemetry_out,
+                     f"ConnectionError (egress policy?): {str(e)[:200]}", current_time)
+
     except Exception as e:
-        _write_error(
-            spark,
-            aircraft_telemetry_out,
-            f"{type(e).__name__}: {str(e)[:220]}",
-            current_time,
-        )
-
-
-def _write_error(spark, output, message: str, timestamp: str):
-    """Write a single error sentinel row so downstream datasets never break."""
-    output.write_dataframe(
-        spark.createDataFrame(
-            [Row(
-                unit_id      = "SYS_FAIL",
-                vehicle_type = "ERROR",
-                latitude     = 0.0,
-                longitude    = 0.0,
-                status       = message[:250],
-                timestamp    = timestamp,
-            )],
-            AIRCRAFT_SCHEMA,
-        )
-    )
+        _write_error(spark, aircraft_telemetry_out,
+                     f"{type(e).__name__}: {str(e)[:220]}", current_time)
