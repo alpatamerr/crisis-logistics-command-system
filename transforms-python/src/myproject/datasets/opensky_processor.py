@@ -27,23 +27,28 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
         username = source.get_secret("additionalSecretOauthClientId")
         password = source.get_secret("additionalSecretOauthClientSecret")
         
-        # İnternete çıkabilmek için mecburen Proxy bilen Foundry client'ını alıyoruz
         conn = source.get_https_connection()
         client = conn.get_client()
-        
-        # Foundry Arayüzündeki (UI) bozuk Auth ayarını zorla devreden çıkarıyoruz
         client.auth = None 
         
-        # Base URL üzerinden ana adrese vuruyoruz
         url = f"{conn.url.rstrip('/')}/api/states/all"
+        
+        # ÇÖZÜM BURADA: Sadece Londra Üzerindeki Uçakları İstiyoruz
+        # Böylece devasa veri yüzünden Timeout (Zaman Aşımı) yemeyeceğiz.
+        london_params = {
+            'lamin': 51.20, # Güney Sınırı
+            'lomin': -0.60, # Batı Sınırı
+            'lamax': 51.70, # Kuzey Sınırı
+            'lomax': 0.30   # Doğu Sınırı
+        }
         
         time.sleep(random.uniform(1.0, 3.0))
         
-        # İsteği Basic Auth ile atıyoruz
         response = client.get(
             url,
             auth=(username, password),
-            timeout=20
+            params=london_params,
+            timeout=30 # Timeout süresini biraz uzattık
         )
 
         response.raise_for_status()
@@ -69,21 +74,18 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
         if parsed_records:
             output_df = spark_session.createDataFrame(parsed_records, AIRCRAFT_SCHEMA)
         else:
-            # Veri gelmediyse boşluk yerine uyarı yaz
-            output_df = spark_session.createDataFrame([Row("WARN", "NO_DATA", 0.0, 0.0, "API baglandi ama data gelmedi", current_time)], AIRCRAFT_SCHEMA)
+            output_df = spark_session.createDataFrame([Row("WARN", "NO_DATA", 0.0, 0.0, "API baglandi ama Londra ustunde ucak yok", current_time)], AIRCRAFT_SCHEMA)
             
         aircraft_telemetry_out.write_dataframe(output_df)
 
     except Exception as e:
-        # HİLE BURADA: Hatayı yutma, direkt tablonun STATÜSÜNE yaz!
         error_msg = f"ERROR: {type(e).__name__} - {str(e)}"
-        
         error_row = Row(
             unit_id="SYS_FAIL",
             vehicle_type="ERROR",
             latitude=0.0,
             longitude=0.0,
-            status=error_msg[:250], # Tabloya sığsın diye 250 karaktere kestik
+            status=error_msg[:250],
             timestamp=current_time
         )
         output_df = spark_session.createDataFrame([error_row], AIRCRAFT_SCHEMA)
