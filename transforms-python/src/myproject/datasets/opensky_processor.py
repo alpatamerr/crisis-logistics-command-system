@@ -31,24 +31,17 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
         client = conn.get_client()
         client.auth = None 
         
-        url = f"{conn.url.rstrip('/')}/api/states/all"
-        
-        # ÇÖZÜM BURADA: Sadece Londra Üzerindeki Uçakları İstiyoruz
-        # Böylece devasa veri yüzünden Timeout (Zaman Aşımı) yemeyeceğiz.
-        london_params = {
-            'lamin': 51.20, # Güney Sınırı
-            'lomin': -0.60, # Batı Sınırı
-            'lamax': 51.70, # Kuzey Sınırı
-            'lomax': 0.30   # Doğu Sınırı
-        }
+        base_url = conn.url.rstrip('/')
+        # PARAMETRELERİ URL'E GÖMDÜK: Foundry proxy'si artık bunu yutamaz.
+        url = f"{base_url}/api/states/all?lamin=51.20&lomin=-0.60&lamax=51.70&lomax=0.30"
         
         time.sleep(random.uniform(1.0, 3.0))
         
+        # Timeout'u kısa tutuyoruz ki Foundry arkada saatlerce denemesin, patlayacaksa hemen patlasın
         response = client.get(
             url,
             auth=(username, password),
-            params=london_params,
-            timeout=30 # Timeout süresini biraz uzattık
+            timeout=15
         )
 
         response.raise_for_status()
