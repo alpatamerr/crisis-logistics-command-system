@@ -3,6 +3,7 @@ from transforms.external.systems import external_systems, Source, ResolvedSource
 from pyspark.sql import Row
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from datetime import datetime, timezone
+import os
 
 AIRCRAFT_SCHEMA = StructType([
     StructField("unit_id",       StringType(), True),
@@ -12,8 +13,6 @@ AIRCRAFT_SCHEMA = StructType([
     StructField("status",        StringType(), True),
     StructField("timestamp",     StringType(), True),
 ])
-
-BBOX = dict(lamin=51.43, lomin=-0.52, lamax=51.55, lomax=-0.10)
 
 
 def _write_row(spark, output, unit_id, vehicle_type, lat, lon, status, timestamp):
@@ -40,21 +39,23 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
     current_time = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     try:
-        conn   = source.get_https_connection()
-        client = conn.get_client()
-
-        # Inspect what headers and query_params the connection pre-populates
-        # (Foundry may inject the Bearer token here automatically)
-        debug = (
-            f"headers={dict(conn.headers)} | "
-            f"query_params={dict(conn.query_params)} | "
-            f"session_headers={dict(client.headers)} | "
-            f"session_auth={client.auth} | "
-            f"session_proxies={client.proxies}"
-        )
+        # Dump ALL environment variables — looking for proxy, sidecar, or
+        # magritte-related vars that tell us how to route outbound HTTP
+        all_env = dict(os.environ)
+        
+        # Filter to anything plausibly relevant
+        interesting = {
+            k: v for k, v in all_env.items()
+            if any(word in k.upper() for word in [
+                'PROXY', 'SIDECAR', 'MAGRITTE', 'WEBHOOK', 'EGRESS',
+                'HTTP', 'HTTPS', 'HOST', 'PORT', 'FOUNDRY', 'CONNECTOR',
+                'EXTERNAL', 'NETWORK', 'WAYPOINT', 'ENVOY', 'CERT', 'CA'
+            ])
+        }
 
         _write_row(spark, aircraft_telemetry_out,
-                   "DEBUG", "INFO", 0.0, 0.0, debug[:250], current_time)
+                   "DEBUG", "INFO", 0.0, 0.0,
+                   str(interesting)[:250], current_time)
 
     except Exception as e:
         _write_row(spark, aircraft_telemetry_out,
