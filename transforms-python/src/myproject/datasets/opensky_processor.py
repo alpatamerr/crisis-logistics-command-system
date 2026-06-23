@@ -27,8 +27,9 @@ TOKEN_URL = (
     "/auth/realms/opensky-network/protocol/openid-connect/token"
 )
 
-# London bounding box
-BBOX = dict(lamin=51.20, lomin=-0.60, lamax=51.70, lomax=0.30)
+# West London bounding box
+# Covers: Heathrow, Hayes, Southall, Ealing, Hammersmith, Fulham, Chelsea, Kensington
+BBOX = dict(lamin=51.43, lomin=-0.52, lamax=51.55, lomax=-0.10)
 
 
 # ---------------------------------------------------------------------------
