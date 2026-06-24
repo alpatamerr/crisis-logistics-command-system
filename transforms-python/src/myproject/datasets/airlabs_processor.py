@@ -8,18 +8,6 @@ API_PATH = "/api/v9/flights"
 BBOX = "51.43,-0.52,51.55,-0.10"  # West London / Heathrow area
 
 
-def _error_row(current_time):
-    """Create a single-row error DataFrame."""
-    return pd.DataFrame([{
-        "unit_id": "SYS_FAIL",
-        "vehicle_type": "ERROR",
-        "latitude": 0.0,
-        "longitude": 0.0,
-        "status": "ERROR",
-        "timestamp": current_time,
-    }])
-
-
 def _parse_flights(flights, current_time):
     """Parse Airlabs flight data into rows."""
     rows = []
@@ -52,7 +40,7 @@ def _parse_flights(flights, current_time):
 @lightweight
 @external_systems(source=Source(SOURCE_RID))
 @transform(
-    output=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/datasets/opensky_processor"),
+    output=Output("ri.foundry.main.dataset.380832ab-a9ed-47f7-a5a9-c9df05e43938"),
 )
 def compute(output, source: ResolvedSource):
     current_time = datetime.now(timezone.utc).isoformat(timespec="seconds")
