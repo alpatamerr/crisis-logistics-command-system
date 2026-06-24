@@ -3,6 +3,11 @@ from transforms.external.systems import external_systems, Source, ResolvedSource
 from pyspark.sql import Row
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from datetime import datetime, timezone
+import urllib.request
+import urllib.parse
+import base64
+import json
+import ssl
 import certifi
 
 AIRCRAFT_SCHEMA = StructType([
@@ -58,38 +63,38 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
         client_id     = source.get_secret("additionalSecretOauthClientId")
         client_secret = source.get_secret("additionalSecretOauthClientSecret")
 
-        conn   = source.get_https_connection()
-        client = conn.get_client()
+        # Use urllib directly — completely different network stack from
+        # requests/CustomCaBundleSession, bypasses Foundry session hooks.
+        # certifi provides public CA bundle for SSL verification.
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
 
-        # auth.opensky-network.org is blocked at network level in this
-        # Foundry environment. Use Basic Auth against opensky-network.org
-        # directly (only domain in approved egress that is reachable).
-        # certifi overrides REQUESTS_CA_BUNDLE=ca.cer (Foundry internal CA)
-        # so public SSL certs on opensky-network.org verify correctly.
-        api_resp = client.get(
-            API_URL,
-            params=BBOX,
-            auth=(client_id, client_secret),
-            verify=certifi.where(),
-            timeout=(8, 20),
+        params  = urllib.parse.urlencode(BBOX)
+        url     = f"{API_URL}?{params}"
+
+        credentials = base64.b64encode(
+            f"{client_id}:{client_secret}".encode()
+        ).decode()
+
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"Basic {credentials}",
+                "User-Agent":    "foundry-transform/1.0",
+            }
         )
 
-        status_code = api_resp.status_code
-        if status_code == 401:
-            _write_row(spark, aircraft_telemetry_out,
-                       "AUTH_FAIL", "ERROR", 0.0, 0.0,
-                       "HTTP 401 — Basic Auth rejected by OpenSky. Need alternative auth route.",
-                       current_time)
-            return
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=20) as resp:
+            status_code = resp.status
+            body        = resp.read()
 
         if status_code != 200:
             _write_row(spark, aircraft_telemetry_out,
                        "API_FAIL", "ERROR", 0.0, 0.0,
-                       f"HTTP {status_code}: {api_resp.text[:180]}",
+                       f"HTTP {status_code}: {body[:180].decode('utf-8', errors='replace')}",
                        current_time)
             return
 
-        states = api_resp.json().get("states") or []
+        states = json.loads(body).get("states") or []
         rows   = [r for r in (_parse_state(s, current_time) for s in states) if r]
 
         if rows:
