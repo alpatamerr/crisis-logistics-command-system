@@ -1,4 +1,4 @@
-from transforms.api import transform_pandas, Output, lightweight
+from transforms.api import transform, Output, lightweight, incremental
 from transforms.external.systems import external_systems, Source, ResolvedSource
 from datetime import datetime, timezone
 import pandas as pd
@@ -8,14 +8,14 @@ API_PATH = "/api/v9/flights"
 BBOX = "51.43,-0.52,51.55,-0.10"  # West London / Heathrow area
 
 
-def _error_row(unit_id, status, current_time):
-    """Create a single-row error/info DataFrame."""
+def _error_row(current_time):
+    """Create a single-row error DataFrame."""
     return pd.DataFrame([{
-        "unit_id": unit_id,
+        "unit_id": "SYS_FAIL",
         "vehicle_type": "ERROR",
         "latitude": 0.0,
         "longitude": 0.0,
-        "status": str(status)[:250],
+        "status": "ERROR",
         "timestamp": current_time,
     }])
 
@@ -28,7 +28,6 @@ def _parse_flights(flights, current_time):
         lat = flight.get("lat")
         lng = flight.get("lng")
         alt = flight.get("alt")
-        on_ground = (alt == 0 or alt is None) if lat is not None else None
         status_raw = flight.get("status", "unknown")
 
         if status_raw == "landed":
@@ -49,12 +48,13 @@ def _parse_flights(flights, current_time):
     return rows
 
 
+@incremental()
 @lightweight
 @external_systems(source=Source(SOURCE_RID))
-@transform_pandas(
-    Output("/Atamer Systems-976c6b/Crisis Logistics Command System/datasets/opensky_processor")
+@transform(
+    output=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/datasets/opensky_processor"),
 )
-def compute(source: ResolvedSource) -> pd.DataFrame:
+def compute(output, source: ResolvedSource):
     current_time = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     try:
@@ -77,11 +77,8 @@ def compute(source: ResolvedSource) -> pd.DataFrame:
         )
 
         if api_resp.status_code != 200:
-            return _error_row(
-                "API_FAIL",
-                f"HTTP {api_resp.status_code}: {api_resp.text[:180]}",
-                current_time,
-            )
+            # Don't write error rows to avoid polluting historical data
+            return
 
         # Parse flight data
         data = api_resp.json()
@@ -89,20 +86,10 @@ def compute(source: ResolvedSource) -> pd.DataFrame:
         rows = _parse_flights(flights, current_time)
 
         if rows:
-            return pd.DataFrame(rows)
-        else:
-            return pd.DataFrame([{
-                "unit_id": "NO_DATA",
-                "vehicle_type": "INFO",
-                "latitude": 0.0,
-                "longitude": 0.0,
-                "status": "API OK — no aircraft in West London bbox right now",
-                "timestamp": current_time,
-            }])
+            df = pd.DataFrame(rows)
+            output.write_table(df)
+        # If no rows, don't write anything (preserves clean history)
 
-    except Exception as e:
-        return _error_row(
-            "SYS_FAIL",
-            f"{type(e).__name__}: {str(e)[:220]}",
-            current_time,
-        )
+    except Exception:
+        # Don't append error rows to historical dataset
+        return
