@@ -4,9 +4,8 @@ from datetime import datetime, timezone
 import pandas as pd
 
 SOURCE_RID = "ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"
-TOKEN_URL = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
-API_PATH = "/api/states/all"
-BBOX = {"lamin": 51.43, "lomin": -0.52, "lamax": 51.55, "lomax": -0.10}
+API_PATH = "/api/v9/flights"
+BBOX = "51.43,-0.52,51.55,-0.10"  # West London / Heathrow area
 
 
 def _error_row(unit_id, status, current_time):
@@ -21,21 +20,29 @@ def _error_row(unit_id, status, current_time):
     }])
 
 
-def _parse_states(states, current_time):
-    """Parse OpenSky state vector array into rows."""
+def _parse_flights(flights, current_time):
+    """Parse Airlabs flight data into rows."""
     rows = []
-    for state in states:
-        if len(state) < 9:
-            continue
-        icao24, lon, lat, on_ground = state[0], state[5], state[6], state[8]
-        status = ("GROUNDED" if on_ground is True
-                  else "AIRBORNE" if on_ground is False
-                  else "UNKNOWN")
+    for flight in flights:
+        hex_id = flight.get("hex")
+        lat = flight.get("lat")
+        lng = flight.get("lng")
+        alt = flight.get("alt")
+        on_ground = (alt == 0 or alt is None) if lat is not None else None
+        status_raw = flight.get("status", "unknown")
+
+        if status_raw == "landed":
+            status = "GROUNDED"
+        elif status_raw in ("en-route", "scheduled"):
+            status = "AIRBORNE"
+        else:
+            status = "UNKNOWN"
+
         rows.append({
-            "unit_id": str(icao24) if icao24 else None,
+            "unit_id": str(hex_id) if hex_id else None,
             "vehicle_type": "AIRCRAFT",
             "latitude": float(lat) if lat is not None else None,
-            "longitude": float(lon) if lon is not None else None,
+            "longitude": float(lng) if lng is not None else None,
             "status": status,
             "timestamp": current_time,
         })
@@ -51,36 +58,21 @@ def compute(source: ResolvedSource) -> pd.DataFrame:
     current_time = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     try:
-        # Get pre-configured HTTP client from the source (requests.Session
-        # with Foundry SSL/proxy settings - routes through egress sidecar)
+        # Get pre-configured HTTP client from the source
         conn = source.get_https_connection()
         client = conn.get_client()
-        base_url = conn.url  # https://opensky-network.org
+        base_url = conn.url  # https://airlabs.co
 
-        # Retrieve OAuth2 credentials from source secrets
-        client_id = source.get_secret("additionalSecretOauthClientId")
-        client_secret = source.get_secret("additionalSecretOauthClientSecret")
+        # Retrieve API key from source secrets
+        api_key = source.get_secret("additionalSecretAirlabsApiKey")
 
-        # Step 1: OAuth2 Client Credentials token exchange
-        # Traffic to auth.opensky-network.org is allowed by the attached egress policy
-        token_resp = client.post(
-            TOKEN_URL,
-            data={
-                "grant_type": "client_credentials",
-                "client_id": client_id,
-                "client_secret": client_secret,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=15,
-        )
-        token_resp.raise_for_status()
-        access_token = token_resp.json()["access_token"]
-
-        # Step 2: Call OpenSky API with Bearer token
+        # Call Airlabs flights API with bounding box
         api_resp = client.get(
             base_url + API_PATH,
-            params=BBOX,
-            headers={"Authorization": f"Bearer {access_token}"},
+            params={
+                "api_key": api_key,
+                "bbox": BBOX,
+            },
             timeout=20,
         )
 
@@ -91,9 +83,10 @@ def compute(source: ResolvedSource) -> pd.DataFrame:
                 current_time,
             )
 
-        # Step 3: Parse state vectors
-        states = api_resp.json().get("states") or []
-        rows = _parse_states(states, current_time)
+        # Parse flight data
+        data = api_resp.json()
+        flights = data.get("response") or []
+        rows = _parse_flights(flights, current_time)
 
         if rows:
             return pd.DataFrame(rows)
@@ -103,7 +96,7 @@ def compute(source: ResolvedSource) -> pd.DataFrame:
                 "vehicle_type": "INFO",
                 "latitude": 0.0,
                 "longitude": 0.0,
-                "status": "API OK - no aircraft in West London bbox right now",
+                "status": "API OK — no aircraft in West London bbox right now",
                 "timestamp": current_time,
             }])
 
