@@ -15,7 +15,6 @@ AIRCRAFT_SCHEMA = StructType([
 ])
 
 SOURCE_RID = "ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"
-TOKEN_URL  = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
 API_URL    = "https://opensky-network.org/api/states/all"
 BBOX       = dict(lamin=51.43, lomin=-0.52, lamax=51.55, lomax=-0.10)
 
@@ -62,46 +61,31 @@ def compute(ctx, aircraft_telemetry_out, source: ResolvedSource):
         conn   = source.get_https_connection()
         client = conn.get_client()
 
-        # Foundry sets REQUESTS_CA_BUNDLE=ca.cer (internal CA only).
-        # Override verify to use certifi's public CA bundle so external
-        # HTTPS hosts like opensky-network.org and auth.opensky-network.org
-        # can be verified correctly.
-        public_ca = certifi.where()
-
-        # Step 1: fetch OAuth2 token using public CA bundle
-        token_resp = client.post(
-            TOKEN_URL,
-            data={
-                "grant_type":    "client_credentials",
-                "client_id":     client_id,
-                "client_secret": client_secret,
-            },
-            verify=public_ca,
-            timeout=(8, 20),
-        )
-
-        if token_resp.status_code != 200:
-            _write_row(spark, aircraft_telemetry_out,
-                       "TOKEN_FAIL", "ERROR", 0.0, 0.0,
-                       f"HTTP {token_resp.status_code}: {token_resp.text[:180]}",
-                       current_time)
-            return
-
-        token = token_resp.json()["access_token"]
-
-        # Step 2: call OpenSky API with Bearer token and public CA bundle
+        # auth.opensky-network.org is blocked at network level in this
+        # Foundry environment. Use Basic Auth against opensky-network.org
+        # directly (only domain in approved egress that is reachable).
+        # certifi overrides REQUESTS_CA_BUNDLE=ca.cer (Foundry internal CA)
+        # so public SSL certs on opensky-network.org verify correctly.
         api_resp = client.get(
             API_URL,
             params=BBOX,
-            headers={"Authorization": f"Bearer {token}"},
-            verify=public_ca,
+            auth=(client_id, client_secret),
+            verify=certifi.where(),
             timeout=(8, 20),
         )
 
-        if api_resp.status_code != 200:
+        status_code = api_resp.status_code
+        if status_code == 401:
+            _write_row(spark, aircraft_telemetry_out,
+                       "AUTH_FAIL", "ERROR", 0.0, 0.0,
+                       "HTTP 401 — Basic Auth rejected by OpenSky. Need alternative auth route.",
+                       current_time)
+            return
+
+        if status_code != 200:
             _write_row(spark, aircraft_telemetry_out,
                        "API_FAIL", "ERROR", 0.0, 0.0,
-                       f"HTTP {api_resp.status_code}: {api_resp.text[:180]}",
+                       f"HTTP {status_code}: {api_resp.text[:180]}",
                        current_time)
             return
 
