@@ -21,7 +21,7 @@ mappings:
   - "READ"
   path: "/deprecated-field"
   rid: "ri.foundry.main.dataset.4bc28207-5239-4f47-99f5-805da54d8e89"
-- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/datasets/opensky_processor"
+- alias: "ri.foundry.main.dataset.380832ab-a9ed-47f7-a5a9-c9df05e43938"
   modes:
   - "BUILD"
   path: "/deprecated-field"
