@@ -51,3 +51,8 @@ mappings:
   - "READ"
   path: "/deprecated-field"
   rid: "ri.magritte..source.acf9fdf5-72dd-43fa-a501-2b418215791c"
+- alias: "ri.transforms.python.semantic.version"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.transforms.python.semantic.version"
