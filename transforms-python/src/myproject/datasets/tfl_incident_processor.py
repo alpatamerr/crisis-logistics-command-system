@@ -1,83 +1,79 @@
-from transforms.api import transform, Output
+from transforms.api import transform, incremental, Output
 from transforms.external.systems import external_systems, Source
-from pyspark.sql import Row
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+import polars as pl
 import requests
 import logging
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-# Enforce a strict schema to guarantee downstream pipeline stability in Pipeline Builder
-INCIDENT_SCHEMA = StructType([
-    StructField("incident_id", StringType(), True),
-    StructField("type", StringType(), True),
-    StructField("severity_level", StringType(), True),
-    StructField("description", StringType(), True),
-    StructField("latitude", DoubleType(), True),
-    StructField("longitude", DoubleType(), True)
-])
 
-# Configured to use the newly approved, dedicated TfL REST API network source
+@incremental()
 @external_systems(source=Source("ri.magritte..source.acf9fdf5-72dd-43fa-a501-2b418215791c"))
-@transform(
+@transform.using(
     live_incidents_out=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/raw_live_incidents")
 )
 def fetch_tfl_live_data(ctx, live_incidents_out, source):
     """
-    Ingests live traffic incidents and road hazards directly from the TfL Unified API.
-    Parses complex nested GeoJSON structures into a standardized tabular Spark DataFrame.
+    Incrementally ingests live traffic disruptions from the TfL Unified API.
+    Each hourly poll appends a timestamped snapshot of active road events,
+    building a historical record of disruptions over time.
     """
     url = "https://api.tfl.gov.uk/Road/All/Disruption"
-    spark_session = ctx.spark_session
-    
+    polled_at = datetime.now(timezone.utc)
+
     try:
         logger.info("Initiating live telemetry pull from TfL API...")
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=30)
         response.raise_for_status()
         disruptions = response.json()
         logger.info(f"Successfully retrieved {len(disruptions)} active road events.")
     except Exception as e:
-        logger.error(f"Critical egress network failure hitting TfL: {str(e)}")
-        # Graceful Fail-Safe: Write an empty dataframe matching schema to prevent breaking downstream builds
-        empty_df = spark_session.createDataFrame([], INCIDENT_SCHEMA)
-        live_incidents_out.write_dataframe(empty_df)
+        logger.error(f"TfL API request failed: {str(e)}")
+        # Abort the job so no empty transaction is committed,
+        # keeping downstream datasets from going stale unnecessarily.
+        ctx.abort_job()
         return
 
+    if not disruptions:
+        logger.warning("TfL endpoint returned an empty disruption payload. Aborting to avoid empty append.")
+        ctx.abort_job()
+        return
+
+    # Parse the JSON response into structured records
     parsed_records = []
-    
     for item in disruptions:
-        # Extract base strings defensively using .get() to avoid key errors
-        incident_id = item.get("id")
-        category = item.get("category")
-        severity = item.get("severity")
-        comments = item.get("comments")
-        
-        # Enterprise Parsing: TfL returns geography as a standard GeoJSON Point object.
-        # CRITICAL: Per RFC 7946, GeoJSON structures coordinates as [Longitude, Latitude]
-        geo = item.get("geography", {})
+        # TfL returns geography as GeoJSON Point: coordinates = [longitude, latitude] per RFC 7946
+        geo = item.get("geography") or {}
         coords = geo.get("coordinates", [])
-        
+
         lat = None
         lng = None
-        
         if isinstance(coords, list) and len(coords) == 2:
-            lng = float(coords[0])  # Longitude is always index 0
-            lat = float(coords[1])  # Latitude is always index 1
-            
-        parsed_records.append(Row(
-            incident_id=incident_id,
-            type=category,
-            severity_level=severity,
-            description=comments,
-            latitude=lat,
-            longitude=lng
-        ))
-        
-    # Construct final Spark DataFrame
-    if parsed_records:
-        output_df = spark_session.createDataFrame(parsed_records, INCIDENT_SCHEMA)
-    else:
-        logger.warn("TfL endpoint returned an empty disruption payload.")
-        output_df = spark_session.createDataFrame([], INCIDENT_SCHEMA)
-        
-    live_incidents_out.write_dataframe(output_df)
+            lng = float(coords[0])
+            lat = float(coords[1])
+
+        parsed_records.append({
+            "incident_id": item.get("id"),
+            "type": item.get("category"),
+            "severity_level": item.get("severity"),
+            "description": item.get("comments"),
+            "latitude": lat,
+            "longitude": lng,
+            "polled_at": polled_at,
+        })
+
+    df = pl.DataFrame(
+        parsed_records,
+        schema={
+            "incident_id": pl.Utf8,
+            "type": pl.Utf8,
+            "severity_level": pl.Utf8,
+            "description": pl.Utf8,
+            "latitude": pl.Float64,
+            "longitude": pl.Float64,
+            "polled_at": pl.Datetime("us", time_zone="UTC"),
+        },
+    )
+
+    live_incidents_out.write_table(df)
