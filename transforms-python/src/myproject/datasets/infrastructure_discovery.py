@@ -20,10 +20,11 @@ TARGET_INFRASTRUCTURE = [
     validated_hubs=Input("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/validated_logistics_hubs")
 )
 def discover_nearby_infrastructure(validated_hubs, discovered_infrastructure, source: ResolvedSource):
-    # Use source HTTPS connection for secure API key handling (key in headers, not URL)
+    # Get API key from source secrets and use HTTPS client for requests
     conn = source.get_https_connection()
     client = conn.get_client()
     base_url = conn.url
+    api_key = source.get_secret("additionalSecretGoogleMapsApiKey")
 
     # Grab the incoming PySpark DataFrame
     hubs_dataframe = validated_hubs.dataframe()
@@ -47,6 +48,7 @@ def discover_nearby_infrastructure(validated_hubs, discovered_infrastructure, so
                         "location": f"{lat},{lng}",
                         "radius": 5000,
                         "type": infra_type,
+                        "key": api_key,
                     },
                     timeout=10,
                 )
