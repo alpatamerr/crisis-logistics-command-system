@@ -4,35 +4,41 @@ import requests
 import logging
 import polars as pl
 from datetime import datetime, timezone
+import time
 
 logger = logging.getLogger(__name__)
 
 TFL_JOURNEY_URL = "https://api.tfl.gov.uk/Journey/JourneyResults/{from_loc}/to/{to_loc}"
 
+# Key West London hub coordinates (hardcoded to avoid marking conflict)
+WEST_LONDON_HUBS = [
+    ("Acton Central", 51.508716, -0.262971),
+    ("Ealing Broadway", 51.514841, -0.301752),
+    ("Clapham Junction", 51.464187, -0.170221),
+    ("Hammersmith", 51.4927, -0.2246),
+    ("Shepherd's Bush", 51.5046, -0.2187),
+    ("Brentford", 51.487547, -0.309651),
+    ("Chiswick", 51.481137, -0.267835),
+    ("Richmond", 51.4613, -0.3013),
+]
+
 
 @lightweight()
 @transform(
-    hubs=Input("ri.foundry.main.dataset.4bc28207-5239-4f47-99f5-805da54d8e89"),
-    incidents=Input("ri.foundry.main.dataset.26801c50-1ffa-46d5-be54-c9c6d3a47066"),
+    incidents=Input("ri.foundry.main.dataset.0fceecd4-5c54-461c-a67f-a0fc07d03dbc"),
     output=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_journey_plans"),
 )
-def compute(hubs, incidents, output):
-    """Calculate public transport journeys from major hubs to active incidents."""
+def compute(incidents, output):
+    """Calculate public transport journeys from hubs to active incidents."""
     polled_at = datetime.now(timezone.utc).isoformat()
-
-    hubs_df = hubs.polars()
     incidents_df = incidents.polars()
-
-    major_hubs = hubs_df.filter(
-        pl.col("type").is_in(["RAIL_STATION", "BUS_STATION"])
-    ).head(10)
 
     active_incidents = incidents_df.filter(
         pl.col("latitude").is_not_null() & pl.col("longitude").is_not_null()
     ).head(10)
 
-    if major_hubs.height == 0 or active_incidents.height == 0:
-        logger.warning("No hubs or incidents for journey planning")
+    if active_incidents.height == 0:
+        logger.warning("No incidents with coordinates for journey planning")
         empty = pl.DataFrame({
             "journey_id": pl.Series([], dtype=pl.Utf8),
             "origin_name": pl.Series([], dtype=pl.Utf8),
@@ -40,23 +46,16 @@ def compute(hubs, incidents, output):
             "duration_minutes": pl.Series([], dtype=pl.Int64),
             "modes_used": pl.Series([], dtype=pl.Utf8),
             "legs_summary": pl.Series([], dtype=pl.Utf8),
-            "departure_time": pl.Series([], dtype=pl.Utf8),
-            "arrival_time": pl.Series([], dtype=pl.Utf8),
             "polled_at": pl.Series([], dtype=pl.Utf8),
         })
         output.write_table(empty)
         return
 
-    import time
     records = []
     api_calls = 0
-    max_calls = 50
+    max_calls = 40
 
-    for hub_row in major_hubs.iter_rows(named=True):
-        hub_name = hub_row["hub_name"]
-        hub_lat = hub_row["lat"]
-        hub_lng = hub_row["lng"]
-
+    for hub_name, hub_lat, hub_lng in WEST_LONDON_HUBS:
         for inc_row in active_incidents.iter_rows(named=True):
             if api_calls >= max_calls:
                 break
@@ -81,23 +80,21 @@ def compute(hubs, incidents, output):
                     journey = journeys[0]
                     legs = journey.get("legs", [])
                     modes = ", ".join(set(leg.get("mode", {}).get("name", "") for leg in legs))
-                    legs_summary = " → ".join(
+                    legs_summary = " > ".join(
                         f"{leg.get('mode', {}).get('name', '')}({leg.get('duration', 0)}min)"
                         for leg in legs
                     )
                     records.append({
-                        "journey_id": f"{hub_row['location_id']}_to_{inc_id}",
+                        "journey_id": f"{hub_name}_to_{inc_id}",
                         "origin_name": hub_name,
                         "destination_id": inc_id,
                         "duration_minutes": journey.get("duration", 0),
                         "modes_used": modes,
                         "legs_summary": legs_summary,
-                        "departure_time": journey.get("startDateTime", ""),
-                        "arrival_time": journey.get("arrivalDateTime", ""),
                         "polled_at": polled_at,
                     })
             except Exception as e:
-                logger.warning(f"Journey planner failed for {hub_name}: {e}")
+                logger.warning(f"Journey planner failed: {e}")
                 continue
 
         if api_calls >= max_calls:
@@ -115,8 +112,6 @@ def compute(hubs, incidents, output):
             "duration_minutes": pl.Series([], dtype=pl.Int64),
             "modes_used": pl.Series([], dtype=pl.Utf8),
             "legs_summary": pl.Series([], dtype=pl.Utf8),
-            "departure_time": pl.Series([], dtype=pl.Utf8),
-            "arrival_time": pl.Series([], dtype=pl.Utf8),
             "polled_at": pl.Series([], dtype=pl.Utf8),
         })
     output.write_table(df)
