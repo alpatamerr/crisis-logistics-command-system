@@ -34,20 +34,24 @@ def compute(tfl_stations, nearby_infra, output):
         pl.lit("tfl").alias("source"),
     ])
 
-    # Load Google Maps nearby infrastructure
-    infra_df = nearby_infra.polars(lazy=True)
-    infra_normalized = infra_df.select([
-        pl.col("place_unique_id").alias("location_id"),
-        pl.col("asset_name").alias("name"),
-        pl.col("infrastructure_category").alias("category"),
-        pl.col("asset_lat").alias("latitude"),
-        pl.col("asset_lng").alias("longitude"),
-        pl.col("asset_address").alias("address"),
-        pl.lit("google_maps").alias("source"),
-    ])
-
-    # Union both sources
-    unified = pl.concat([tfl_normalized, infra_normalized])
+    # Load Google Maps nearby infrastructure (may be empty if API hasn't returned data yet)
+    try:
+        infra_df = nearby_infra.polars(lazy=True)
+        infra_normalized = infra_df.select([
+            pl.col("place_unique_id").alias("location_id"),
+            pl.col("asset_name").alias("name"),
+            pl.col("infrastructure_category").alias("category"),
+            pl.col("asset_lat").alias("latitude"),
+            pl.col("asset_lng").alias("longitude"),
+            pl.col("asset_address").alias("address"),
+            pl.lit("google_maps").alias("source"),
+        ])
+        unified = pl.concat([tfl_normalized, infra_normalized])
+        logger.info("Merged TfL stations + Google Maps infrastructure")
+    except Exception as e:
+        logger.warning(f"Could not load nearby_infrastructure (may not have data yet): {e}")
+        unified = tfl_normalized
+        logger.info("Using TfL stations only (Google Maps data not yet available)")
 
     # Filter to West London bounding box (safety net)
     unified = unified.filter(
