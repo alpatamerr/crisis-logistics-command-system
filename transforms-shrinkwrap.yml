@@ -26,6 +26,16 @@ mappings:
   - "READ"
   path: "/deprecated-field"
   rid: "ri.foundry.main.dataset.6f9dd1ed-401f-4838-a603-53537ec85d70"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_bus_arrivals"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.22f507fd-89f0-42d5-8e00-38c7022ee75e"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_journey_plans"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.a9cef37b-13f9-40fa-9987-09e3a58b7851"
 - alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_line_status"
   modes:
   - "BUILD"
