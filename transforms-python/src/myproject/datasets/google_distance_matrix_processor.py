@@ -21,6 +21,7 @@ def compute(hubs, incidents, output, source):
     conn = source.get_https_connection()
     client = conn.get_client()
     base_url = conn.url
+    api_key = source.get_secret("additionalSecretGoogleMapsApiKey")
 
     hubs_df = hubs.polars()
     incidents_df = incidents.polars()
@@ -68,6 +69,7 @@ def compute(hubs, incidents, output, source):
                     "destinations": destinations,
                     "mode": "driving",
                     "departure_time": "now",
+                    "key": api_key,
                 },
                 timeout=20,
             )
