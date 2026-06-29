@@ -30,7 +30,7 @@ def compute(ctx, output, source):
     polled_at = datetime.now(timezone.utc).isoformat()
     records = []
 
-    for mode in ["tube,elizabeth-line,overground,dlr", "bus"]:
+    for mode in ["tube,elizabeth-line,overground,dlr", "bus", "river-bus"]:
         url = TFL_STATUS_URL.format(mode=mode)
         logger.info(f"Fetching TfL line status: {url}")
         try:
