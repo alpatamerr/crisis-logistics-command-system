@@ -7,8 +7,14 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+# West London bounding box
+WEST_LONDON_LAT_MIN = 51.41
+WEST_LONDON_LAT_MAX = 51.56
+WEST_LONDON_LON_MIN = -0.50
+WEST_LONDON_LON_MAX = -0.15
 
-@incremental()
+
+@incremental(semantic_version=1)
 @external_systems(source=Source("ri.magritte..source.acf9fdf5-72dd-43fa-a501-2b418215791c"))
 @transform.using(
     live_incidents_out=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/raw_live_incidents")
@@ -52,6 +58,11 @@ def fetch_tfl_live_data(ctx, live_incidents_out, source):
         if isinstance(coords, list) and len(coords) == 2:
             lng = float(coords[0])
             lat = float(coords[1])
+
+        # Filter to West London only
+        if lat is not None and lng is not None:
+            if not (WEST_LONDON_LAT_MIN <= lat <= WEST_LONDON_LAT_MAX and WEST_LONDON_LON_MIN <= lng <= WEST_LONDON_LON_MAX):
+                continue
 
         parsed_records.append({
             "incident_id": item.get("id"),

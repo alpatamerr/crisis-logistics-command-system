@@ -1,6 +1,5 @@
 from transforms.api import transform, Input, Output, incremental
 from transforms.external.systems import external_systems, Source, ResolvedSource
-import requests
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,6 +12,7 @@ TARGET_INFRASTRUCTURE = [
     "gas_station"
 ]
 
+
 @external_systems(source=Source("ri.magritte..source.0049ef11-1810-4389-96bb-de55ac0f528f"))
 @incremental()
 @transform(
@@ -20,14 +20,17 @@ TARGET_INFRASTRUCTURE = [
     validated_hubs=Input("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/validated_logistics_hubs")
 )
 def discover_nearby_infrastructure(validated_hubs, discovered_infrastructure, source: ResolvedSource):
-    api_key = source.get_secret("additionalSecretGoogleMapsApiKey")
-    
+    # Use source HTTPS connection for secure API key handling (key in headers, not URL)
+    conn = source.get_https_connection()
+    client = conn.get_client()
+    base_url = conn.url
+
     # Grab the incoming PySpark DataFrame
     hubs_dataframe = validated_hubs.dataframe()
     df = hubs_dataframe.toPandas()
-    
+
     assets_discovered = []
-    
+
     if df.empty:
         logger.info("Zero new tracking coordinates detected. API pipeline idle.")
         return
@@ -35,15 +38,21 @@ def discover_nearby_infrastructure(validated_hubs, discovered_infrastructure, so
     for index, row in df.iterrows():
         hub_name = row.get('hub_name', f"Zone_{index}")
         lat, lng = row['lat'], row['lng']
-        
+
         for infra_type in TARGET_INFRASTRUCTURE:
-            url = f"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={lat},{lng}&radius=5000&type={infra_type}&key={api_key}"
-            
             try:
-                response = requests.get(url, timeout=10)
+                response = client.get(
+                    base_url + "/maps/api/place/nearbysearch/json",
+                    params={
+                        "location": f"{lat},{lng}",
+                        "radius": 5000,
+                        "type": infra_type,
+                    },
+                    timeout=10,
+                )
                 data = response.json()
                 status = data.get("status")
-                
+
                 if status == "OK":
                     for place in data.get("results", []):
                         assets_discovered.append({
@@ -55,7 +64,7 @@ def discover_nearby_infrastructure(validated_hubs, discovered_infrastructure, so
                             "asset_lng": place.get("geometry", {}).get("location", {}).get("lng"),
                             "asset_address": place.get("vicinity")
                         })
-            except requests.exceptions.RequestException as e:
+            except Exception as e:
                 logger.error(f"Network call dropped for {hub_name}: {str(e)}")
                 continue
 

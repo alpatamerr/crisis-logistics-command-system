@@ -5,7 +5,7 @@ import pandas as pd
 
 SOURCE_RID = "ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"
 API_PATH = "/api/v9/flights"
-BBOX = "51.43,-0.52,51.55,-0.10"  # West London / Heathrow area
+BBOX = "51.41,-0.50,51.56,-0.15"  # West London bounding box
 
 
 def _parse_flights(flights, current_time):
@@ -36,7 +36,7 @@ def _parse_flights(flights, current_time):
     return rows
 
 
-@incremental()
+@incremental(semantic_version=1)
 @lightweight
 @external_systems(source=Source(SOURCE_RID))
 @transform(
