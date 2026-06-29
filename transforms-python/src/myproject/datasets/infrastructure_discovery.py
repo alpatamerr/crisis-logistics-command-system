@@ -70,7 +70,23 @@ def discover_nearby_infrastructure(validated_hubs, discovered_infrastructure, so
                 logger.error(f"Network call dropped for {hub_name}: {str(e)}")
                 continue
 
+    from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+
+    schema = StructType([
+        StructField("logistics_hub_origin", StringType(), True),
+        StructField("infrastructure_category", StringType(), True),
+        StructField("asset_name", StringType(), True),
+        StructField("place_unique_id", StringType(), True),
+        StructField("asset_lat", DoubleType(), True),
+        StructField("asset_lng", DoubleType(), True),
+        StructField("asset_address", StringType(), True),
+    ])
+
+    spark = hubs_dataframe.sparkSession
     if assets_discovered:
-        # FIX: Borrow the active sparkSession directly from the input dataset dataframe
-        spark_df = hubs_dataframe.sparkSession.createDataFrame(assets_discovered)
-        discovered_infrastructure.write_dataframe(spark_df)
+        spark_df = spark.createDataFrame(assets_discovered, schema=schema)
+    else:
+        logger.warning("No infrastructure discovered — writing empty schema")
+        spark_df = spark.createDataFrame([], schema=schema)
+
+    discovered_infrastructure.write_dataframe(spark_df)
