@@ -1,6 +1,5 @@
 """TfL Bus Arrivals - real-time bus arrival predictions at West London stops."""
 from transforms.api import transform, Input, Output, lightweight
-from transforms.external.systems import external_systems, Source
 import requests
 import logging
 import polars as pl
@@ -12,14 +11,11 @@ TFL_ARRIVALS_URL = "https://api.tfl.gov.uk/StopPoint/{stop_id}/Arrivals"
 
 
 @lightweight()
-@external_systems(
-    source=Source("ri.magritte..source.acf9fdf5-72dd-43fa-a501-2b418215791c"),
-)
 @transform(
     hubs=Input("ri.foundry.main.dataset.4bc28207-5239-4f47-99f5-805da54d8e89"),
     output=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_bus_arrivals"),
 )
-def compute(hubs, output, source):
+def compute(hubs, output):
     """Fetch real-time bus arrivals at top West London bus/rail stations."""
     polled_at = datetime.now(timezone.utc).isoformat()
     hubs_df = hubs.polars()

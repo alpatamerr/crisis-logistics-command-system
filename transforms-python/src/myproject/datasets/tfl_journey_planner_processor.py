@@ -1,6 +1,5 @@
 """TfL Journey Planner - multi-modal public transport routes from hubs to incidents."""
 from transforms.api import transform, Input, Output, lightweight
-from transforms.external.systems import external_systems, Source
 import requests
 import logging
 import polars as pl
@@ -12,15 +11,12 @@ TFL_JOURNEY_URL = "https://api.tfl.gov.uk/Journey/JourneyResults/{from_loc}/to/{
 
 
 @lightweight()
-@external_systems(
-    source=Source("ri.magritte..source.acf9fdf5-72dd-43fa-a501-2b418215791c"),
-)
 @transform(
     hubs=Input("ri.foundry.main.dataset.4bc28207-5239-4f47-99f5-805da54d8e89"),
     incidents=Input("ri.foundry.main.dataset.26801c50-1ffa-46d5-be54-c9c6d3a47066"),
     output=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_journey_plans"),
 )
-def compute(hubs, incidents, output, source):
+def compute(hubs, incidents, output):
     """Calculate public transport journeys from major hubs to active incidents."""
     polled_at = datetime.now(timezone.utc).isoformat()
 
