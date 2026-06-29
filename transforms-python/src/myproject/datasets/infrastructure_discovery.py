@@ -1,4 +1,4 @@
-from transforms.api import transform, Input, Output, incremental
+from transforms.api import transform, Input, Output
 from transforms.external.systems import external_systems, Source, ResolvedSource
 import logging
 
@@ -14,7 +14,6 @@ TARGET_INFRASTRUCTURE = [
 
 
 @external_systems(source=Source("ri.magritte..source.0049ef11-1810-4389-96bb-de55ac0f528f"))
-@incremental()
 @transform(
     discovered_infrastructure=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/nearby_infrastructure"),
     validated_hubs=Input("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/validated_logistics_hubs")
