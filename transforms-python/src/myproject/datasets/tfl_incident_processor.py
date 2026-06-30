@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 # West London bounding box
 WEST_LONDON_LAT_MIN = 51.41
-WEST_LONDON_LAT_MAX = 51.56
+WEST_LONDON_LAT_MAX = 51.60
 WEST_LONDON_LON_MIN = -0.50
 WEST_LONDON_LON_MAX = -0.15
 

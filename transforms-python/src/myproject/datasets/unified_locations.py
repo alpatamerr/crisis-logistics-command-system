@@ -55,7 +55,7 @@ def compute(tfl_stations, nearby_infra, output):
 
     # Filter to West London bounding box (safety net)
     unified = unified.filter(
-        (pl.col("latitude") >= 51.41) & (pl.col("latitude") <= 51.56) &
+        (pl.col("latitude") >= 51.41) & (pl.col("latitude") <= 51.60) &
         (pl.col("longitude") >= -0.50) & (pl.col("longitude") <= -0.15)
     )
 
