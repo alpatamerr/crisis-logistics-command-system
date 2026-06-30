@@ -36,6 +36,12 @@ def compute(airlabs, bikepoints, output):
     # Union both sources
     unified = pl.concat([aircraft_cols, bikes_cols], how="vertical_relaxed")
 
+    # Filter to West London bounding box
+    unified = unified.filter(
+        (pl.col("latitude") >= 51.41) & (pl.col("latitude") <= 51.56) &
+        (pl.col("longitude") >= -0.50) & (pl.col("longitude") <= -0.15)
+    )
+
     # Deduplicate on unit_id — keep latest position per unit
     unified = unified.sort("last_seen_at", descending=True)
     unified = unified.unique(subset=["unit_id"], keep="first")

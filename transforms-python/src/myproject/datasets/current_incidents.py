@@ -24,6 +24,11 @@ def compute(raw_incidents, output):
         df
         .sort("polled_at", descending=True)
         .unique(subset=["incident_id"], keep="first")
+        # Filter to West London bounding box
+        .filter(
+            (pl.col("latitude") >= 51.41) & (pl.col("latitude") <= 51.56) &
+            (pl.col("longitude") >= -0.50) & (pl.col("longitude") <= -0.15)
+        )
         .with_columns(
             pl.struct([pl.col("latitude"), pl.col("longitude")])
             .map_elements(
