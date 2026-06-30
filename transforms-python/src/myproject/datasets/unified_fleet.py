@@ -38,8 +38,8 @@ def compute(airlabs, bikepoints, output):
 
     # Filter to West London bounding box
     unified = unified.filter(
-        (pl.col("latitude") >= 51.41) & (pl.col("latitude") <= 51.60) &
-        (pl.col("longitude") >= -0.50) & (pl.col("longitude") <= -0.15)
+        (pl.col("latitude") >= 51.38) & (pl.col("latitude") <= 51.63) &
+        (pl.col("longitude") >= -0.51) & (pl.col("longitude") <= -0.17)
     )
 
     # Deduplicate on unit_id — keep latest position per unit

@@ -8,10 +8,10 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 # West London bounding box
-WEST_LONDON_LAT_MIN = 51.41
-WEST_LONDON_LAT_MAX = 51.60
-WEST_LONDON_LON_MIN = -0.50
-WEST_LONDON_LON_MAX = -0.15
+WEST_LONDON_LAT_MIN = 51.38
+WEST_LONDON_LAT_MAX = 51.63
+WEST_LONDON_LON_MIN = -0.51
+WEST_LONDON_LON_MAX = -0.17
 
 
 @incremental(semantic_version=1)

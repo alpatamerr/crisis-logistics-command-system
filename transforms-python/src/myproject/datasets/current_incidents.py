@@ -26,8 +26,8 @@ def compute(raw_incidents, output):
         .unique(subset=["incident_id"], keep="first")
         # Filter to West London bounding box
         .filter(
-            (pl.col("latitude") >= 51.41) & (pl.col("latitude") <= 51.60) &
-            (pl.col("longitude") >= -0.50) & (pl.col("longitude") <= -0.15)
+            (pl.col("latitude") >= 51.38) & (pl.col("latitude") <= 51.63) &
+            (pl.col("longitude") >= -0.51) & (pl.col("longitude") <= -0.17)
         )
         .with_columns(
             pl.struct([pl.col("latitude"), pl.col("longitude")])
