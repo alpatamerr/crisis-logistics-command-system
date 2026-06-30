@@ -62,5 +62,50 @@ def compute(tfl_stations, nearby_infra, output):
     # Deduplicate on location_id (keep first occurrence)
     unified = unified.unique(subset=["location_id"], keep="first")
 
+    # Add geohash for Map widget
+    unified = unified.with_columns(
+        pl.struct([pl.col("latitude"), pl.col("longitude")])
+        .map_elements(
+            lambda s: _geohash(s["latitude"], s["longitude"]),
+            return_dtype=pl.Utf8,
+        )
+        .alias("geohash")
+    )
+
     logger.info("Unified locations dataset created from TfL + Google Maps")
     output.write_table(unified)
+
+
+def _geohash(lat, lng, precision=12):
+    if lat is None or lng is None:
+        return None
+    BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
+    lat_range, lng_range = [-90.0, 90.0], [-180.0, 180.0]
+    bits = [16, 8, 4, 2, 1]
+    geohash = []
+    even = True
+    bit = 0
+    ch = 0
+    while len(geohash) < precision:
+        if even:
+            mid = (lng_range[0] + lng_range[1]) / 2
+            if lng > mid:
+                ch |= bits[bit]
+                lng_range[0] = mid
+            else:
+                lng_range[1] = mid
+        else:
+            mid = (lat_range[0] + lat_range[1]) / 2
+            if lat > mid:
+                ch |= bits[bit]
+                lat_range[0] = mid
+            else:
+                lat_range[1] = mid
+        even = not even
+        if bit < 4:
+            bit += 1
+        else:
+            geohash.append(BASE32[ch])
+            bit = 0
+            ch = 0
+    return "".join(geohash)
