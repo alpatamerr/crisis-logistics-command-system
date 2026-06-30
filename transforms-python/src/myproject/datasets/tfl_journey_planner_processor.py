@@ -1,5 +1,6 @@
 """TfL Journey Planner - multi-modal public transport routes from hubs to incidents."""
 from transforms.api import transform, Input, Output, lightweight
+from transforms.external.systems import external_systems, Source
 import requests
 import logging
 import polars as pl
@@ -24,6 +25,9 @@ WEST_LONDON_HUBS = [
 
 
 @lightweight()
+@external_systems(
+    source=Source("ri.magritte..source.acf9fdf5-72dd-43fa-a501-2b418215791c"),
+)
 @transform(
     incidents=Input("ri.foundry.main.dataset.0fceecd4-5c54-461c-a67f-a0fc07d03dbc"),
     output=Output("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_journey_plans"),
