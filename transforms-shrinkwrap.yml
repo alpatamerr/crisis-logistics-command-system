@@ -1,5 +1,11 @@
 ---
 mappings:
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/lime_scooter_positions"
+  modes:
+  - "BUILD"
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.ef8b1726-6415-415b-87b2-0e31e6e60e69"
 - alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/nearby_infrastructure"
   modes:
   - "BUILD"
