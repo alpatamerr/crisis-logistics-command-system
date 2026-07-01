@@ -22,15 +22,33 @@ WEST_LONDON_LAT_MAX = 51.63
 WEST_LONDON_LON_MIN = -0.51
 WEST_LONDON_LON_MAX = -0.17
 
-# Key West London bus lines (major routes through the 7 boroughs)
+# West London bus lines - comprehensive coverage of all 7 boroughs
+# Brent, Harrow, Ealing, Hammersmith & Fulham, Hillingdon, Hounslow, Richmond
 WEST_LONDON_BUS_LINES = [
-    "65", "207", "427", "E1", "E3", "E5", "E7", "E8", "E9", "E10", "E11",
-    "H91", "H98", "140", "195", "237", "267", "281", "285", "371",
-    "482", "488", "490", "H17", "H20", "H22", "H28", "H32",
-    "83", "72", "94", "148", "218", "220", "223", "228",
+    # Ealing / Greenford / Southall
+    "65", "207", "226", "232", "266", "297", "427",
+    "E1", "E2", "E3", "E5", "E7", "E8", "E9", "E10", "E11",
+    # Harrow / Stanmore / Wealdstone
+    "H9", "H10", "H11", "H12", "H13", "H14", "H17", "H18", "H19",
+    "114", "140", "182", "183", "186", "258", "340", "398",
+    # Brent / Wembley / Kilburn
+    "18", "83", "92", "182", "206", "224", "260", "302", "316", "324", "332",
+    # Hammersmith / Shepherd's Bush / Fulham
+    "72", "94", "148", "211", "220", "237", "283", "295", "391",
+    # Hillingdon / Uxbridge / Hayes
+    "U1", "U2", "U3", "U4", "U5", "U7", "U9", "U10",
+    "222", "350", "607",
+    # Hounslow / Feltham / Chiswick
+    "H28", "H37", "H91", "H98", "110", "111", "116", "117", "120", "203", "235",
+    # Richmond / Twickenham / Kingston
+    "33", "85", "110", "190", "265", "281", "285", "371", "419", "493",
+    "R68", "R70",
+    # Cross-borough routes
+    "195", "267", "482", "488", "490",
 ]
 
-HARD_CALL_LIMIT = 40
+# 500 requests/min allowed by TfL — use up to 300 per run (safe margin)
+HARD_CALL_LIMIT = 300
 
 OUTPUT_SCHEMA = {
     "unit_id": pl.Utf8,
