@@ -46,6 +46,12 @@ mappings:
   - "BUILD"
   path: "/deprecated-field"
   rid: "ri.foundry.main.dataset.b821f22a-2559-4881-9401-b6ec29aa0280"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_vehicle_positions"
+  modes:
+  - "BUILD"
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.ff16028e-c0ce-4835-8656-2e667e4ee285"
 - alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/travel_time_matrix"
   modes:
   - "BUILD"
