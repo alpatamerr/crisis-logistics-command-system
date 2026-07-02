@@ -11,7 +11,7 @@ import polars as pl
     trains=Input("/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_train_positions"),
     output=Output("ri.foundry.main.dataset.a774feec-e2a6-4f7e-8d14-279efe3f34ac"),
 )
-def compute(airlabs, bikepoints, buses, output):
+def compute(airlabs, bikepoints, buses, trains, output):
     """Merge aircraft, bikepoint, and bus data into unified fleet view."""
     # Read airlabs aircraft data
     aircraft_df = airlabs.polars()
