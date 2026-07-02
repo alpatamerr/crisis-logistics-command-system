@@ -64,6 +64,7 @@ def compute(airlabs, bikepoints, buses, trains, output):
             pl.col("vehicle_type"),
             pl.col("latitude"),
             pl.col("longitude"),
+            pl.lit("active").alias("status"),
             pl.col("last_seen_at"),
         ])
     else:
@@ -72,6 +73,7 @@ def compute(airlabs, bikepoints, buses, trains, output):
             "vehicle_type": pl.Series([], dtype=pl.Utf8),
             "latitude": pl.Series([], dtype=pl.Float64),
             "longitude": pl.Series([], dtype=pl.Float64),
+            "status": pl.Series([], dtype=pl.Utf8),
             "last_seen_at": pl.Series([], dtype=pl.Utf8),
         })
 
