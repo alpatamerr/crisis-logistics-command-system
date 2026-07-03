@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Card, Spinner, HTMLTable, Tag, Intent, Callout, Icon } from "@blueprintjs/core";
+import { Card, Spinner, HTMLTable, Tag, Intent, Callout, Icon, InputGroup, Button } from "@blueprintjs/core";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { TravelTime, JourneyPlan, AirQuality } from "@crisis-logistics-command-app/sdk";
 
@@ -30,6 +30,8 @@ function MetricCard({ title, value, subtitle, intent, icon, loading }: {
 export default function Analytics() {
   const [ttSort, setTtSort] = useState<SortDir>("asc");
   const [jpSort, setJpSort] = useState<SortDir>("asc");
+  const [hubSearch, setHubSearch] = useState("");
+  const [modeFilter, setModeFilter] = useState<string | null>(null);
 
   const travelTimes = useOsdkObjects(TravelTime, {
     orderBy: { travelTimeSeconds: "asc" },
@@ -41,25 +43,56 @@ export default function Analytics() {
   });
   const airQuality = useOsdkObjects(AirQuality, { pageSize: 10 });
 
+  // Unique modes from journey plans
+  const journeyModes = useMemo(() => {
+    const modes = new Set<string>();
+    (journeyPlans.data ?? []).forEach(jp => {
+      if (jp.modesUsed) {
+        jp.modesUsed.split(",").forEach(m => {
+          const trimmed = m.trim();
+          if (trimmed) {
+            modes.add(trimmed);
+          }
+        });
+      }
+    });
+    return Array.from(modes).sort();
+  }, [journeyPlans.data]);
+
   const sortedTravelTimes = useMemo(() => {
-    const data = [...(travelTimes.data ?? [])];
+    let data = [...(travelTimes.data ?? [])];
+    // Hub search filter
+    if (hubSearch) {
+      const term = hubSearch.toLowerCase();
+      data = data.filter(tt => {
+        const name = (tt.hubName ?? "").toLowerCase();
+        return name.includes(term);
+      });
+    }
     data.sort((a, b) => {
       const aVal = Number(a.travelTimeSeconds ?? 0);
       const bVal = Number(b.travelTimeSeconds ?? 0);
       return ttSort === "asc" ? aVal - bVal : bVal - aVal;
     });
     return data;
-  }, [travelTimes.data, ttSort]);
+  }, [travelTimes.data, ttSort, hubSearch]);
 
   const sortedJourneyPlans = useMemo(() => {
-    const data = [...(journeyPlans.data ?? [])];
+    let data = [...(journeyPlans.data ?? [])];
+    // Mode filter
+    if (modeFilter) {
+      data = data.filter(jp => {
+        const modes = (jp.modesUsed ?? "").toLowerCase();
+        return modes.includes(modeFilter.toLowerCase());
+      });
+    }
     data.sort((a, b) => {
       const aVal = Number(a.durationMinutes ?? 0);
       const bVal = Number(b.durationMinutes ?? 0);
       return jpSort === "asc" ? aVal - bVal : bVal - aVal;
     });
     return data;
-  }, [journeyPlans.data, jpSort]);
+  }, [journeyPlans.data, jpSort, modeFilter]);
 
   const hasError = travelTimes.error || journeyPlans.error || airQuality.error;
   const currentAQ = (airQuality.data ?? []).find(aq => aq.forecastType === "Current");
@@ -121,9 +154,17 @@ export default function Analytics() {
           <Icon icon="time" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
           Travel Times
           {!travelTimes.isLoading && (
-            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(travelTimes.data ?? []).length}</Tag>
+            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{sortedTravelTimes.length}</Tag>
           )}
         </h4>
+        <InputGroup
+          leftIcon="search"
+          placeholder="Search hubs..."
+          value={hubSearch}
+          onChange={(e) => setHubSearch(e.target.value)}
+          small
+          style={{ width: 180 }}
+        />
       </div>
       <Card className="panel-card" style={{ marginBottom: 20 }}>
         {travelTimes.isLoading && !travelTimes.data && (
@@ -174,9 +215,29 @@ export default function Analytics() {
           <Icon icon="path-search" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
           Journey Plans
           {!journeyPlans.isLoading && (
-            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(journeyPlans.data ?? []).length}</Tag>
+            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{sortedJourneyPlans.length}</Tag>
           )}
         </h4>
+      </div>
+      {/* Mode filter pills */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+        <Button
+          text="All Modes"
+          small
+          minimal={modeFilter !== null}
+          intent={modeFilter === null ? Intent.PRIMARY : Intent.NONE}
+          onClick={() => setModeFilter(null)}
+        />
+        {journeyModes.map(m => (
+          <Button
+            key={m}
+            text={m}
+            small
+            minimal={modeFilter !== m}
+            intent={modeFilter === m ? Intent.PRIMARY : Intent.NONE}
+            onClick={() => setModeFilter(modeFilter === m ? null : m)}
+          />
+        ))}
       </div>
       <Card className="panel-card">
         {journeyPlans.isLoading && !journeyPlans.data && (

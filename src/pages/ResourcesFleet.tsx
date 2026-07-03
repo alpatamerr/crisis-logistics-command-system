@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback } from "react";
 import {
   Card, Tag, Intent, Spinner, HTMLTable, Button, Callout, Icon,
-  InputGroup, NumericInput, Dialog, DialogBody, DialogFooter, FormGroup
+  InputGroup, NumericInput, Dialog, DialogBody, DialogFooter, FormGroup, Switch
 } from "@blueprintjs/core";
 import { useOsdkObjects, useOsdkAction } from "@osdk/react/experimental";
 import { CrisisResource, LiveTransportUnit, $Actions } from "@crisis-logistics-command-app/sdk";
 
+type SortDir = "asc" | "desc";
 const FLEET_PAGE_SIZE = 50;
 
 export default function ResourcesFleet() {
@@ -19,6 +20,11 @@ export default function ResourcesFleet() {
   const [updateTarget, setUpdateTarget] = useState<string | null>(null);
   const [updateQty, setUpdateQty] = useState(0);
 
+  // Resource filters
+  const [resourceTypeFilter, setResourceTypeFilter] = useState<string | null>(null);
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [quantitySort, setQuantitySort] = useState<SortDir | null>(null);
+
   // ─── Fleet State ───
   const [vehicleFilter, setVehicleFilter] = useState<string | null>(null);
   const [fleetVisible, setFleetVisible] = useState(FLEET_PAGE_SIZE);
@@ -31,6 +37,35 @@ export default function ResourcesFleet() {
   const createAction = useOsdkAction($Actions.createCrisisResource);
   const deleteAction = useOsdkAction($Actions.deleteCrisisResource);
   const updateAction = useOsdkAction($Actions.updateResourceInventory);
+
+  // ─── Resource filtering ───
+  const resourceTypes = useMemo(() => {
+    const types = new Set<string>();
+    (resources.data ?? []).forEach(r => {
+      if (r.resourceType) {
+        types.add(r.resourceType);
+      }
+    });
+    return Array.from(types).sort();
+  }, [resources.data]);
+
+  const filteredResources = useMemo(() => {
+    let data = resources.data ?? [];
+    if (resourceTypeFilter) {
+      data = data.filter(r => r.resourceType === resourceTypeFilter);
+    }
+    if (showLowStockOnly) {
+      data = data.filter(r => (r.quantityUnits ?? 0) < (r.criticalThreshold ?? 0));
+    }
+    if (quantitySort) {
+      data = [...data].sort((a, b) => {
+        const aQty = a.quantityUnits ?? 0;
+        const bQty = b.quantityUnits ?? 0;
+        return quantitySort === "asc" ? aQty - bQty : bQty - aQty;
+      });
+    }
+    return data;
+  }, [resources.data, resourceTypeFilter, showLowStockOnly, quantitySort]);
 
   // ─── Fleet filtering ───
   const vehicleTypes = useMemo(() => {
@@ -116,7 +151,7 @@ export default function ResourcesFleet() {
           <Icon icon="inbox" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
           Resources
           {!resources.isLoading && (
-            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(resources.data ?? []).length}</Tag>
+            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{filteredResources.length}</Tag>
           )}
         </h4>
         <Button
@@ -126,6 +161,34 @@ export default function ResourcesFleet() {
           small
           minimal
           onClick={() => setShowCreateForm(!showCreateForm)}
+        />
+      </div>
+
+      {/* Resource Filters */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        <Button
+          text="All Types"
+          small
+          minimal={resourceTypeFilter !== null}
+          intent={resourceTypeFilter === null ? Intent.PRIMARY : Intent.NONE}
+          onClick={() => setResourceTypeFilter(null)}
+        />
+        {resourceTypes.map(rt => (
+          <Button
+            key={rt}
+            text={rt}
+            small
+            minimal={resourceTypeFilter !== rt}
+            intent={resourceTypeFilter === rt ? Intent.PRIMARY : Intent.NONE}
+            onClick={() => setResourceTypeFilter(resourceTypeFilter === rt ? null : rt)}
+          />
+        ))}
+        <div style={{ width: 1, height: 16, background: "#d8e1e8" }} />
+        <Switch
+          checked={showLowStockOnly}
+          onChange={() => setShowLowStockOnly(!showLowStockOnly)}
+          label="Low Stock Only"
+          style={{ marginBottom: 0, fontSize: 12 }}
         />
       </div>
 
@@ -175,26 +238,31 @@ export default function ResourcesFleet() {
         {resources.isLoading && !resources.data && (
           <div style={{ padding: 32, textAlign: "center" }}><Spinner /></div>
         )}
-        {(resources.data ?? []).length === 0 && !resources.isLoading && (
+        {filteredResources.length === 0 && !resources.isLoading && (
           <div className="empty-state">
             <Icon icon="inbox" size={24} />
-            <p>No resources created yet. Click &ldquo;Create Resource&rdquo; to add one.</p>
+            <p>{resourceTypeFilter || showLowStockOnly ? "No resources match the current filters" : "No resources created yet. Click \"Create Resource\" to add one."}</p>
           </div>
         )}
-        {(resources.data ?? []).length > 0 && (
+        {filteredResources.length > 0 && (
           <HTMLTable bordered striped style={{ width: "100%" }}>
             <thead>
               <tr>
                 <th>Resource ID</th>
                 <th>Type</th>
-                <th>Quantity</th>
+                <th
+                  style={{ cursor: "pointer", userSelect: "none" }}
+                  onClick={() => setQuantitySort(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc")}
+                >
+                  Quantity {quantitySort && <Icon icon={quantitySort === "asc" ? "sort-asc" : "sort-desc"} size={12} />}
+                </th>
                 <th>Threshold</th>
                 <th>Status</th>
                 <th style={{ width: 100 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {(resources.data ?? []).map((res) => {
+              {filteredResources.map((res) => {
                 const isLow = (res.quantityUnits ?? 0) < (res.criticalThreshold ?? 0);
                 return (
                   <tr key={res.resourceId}>

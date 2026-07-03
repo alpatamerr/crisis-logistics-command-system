@@ -1,8 +1,15 @@
-import { Card, Tag, Intent, Spinner, HTMLTable, Callout, Icon } from "@blueprintjs/core";
+import { useState, useMemo } from "react";
+import { Card, Tag, Intent, Spinner, HTMLTable, Callout, Icon, Button, InputGroup } from "@blueprintjs/core";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { LineStatus, RoadStatus, BusArrival } from "@crisis-logistics-command-app/sdk";
 
 export default function TransportStatus() {
+  // Filters
+  const [modeFilter, setModeFilter] = useState<string | null>(null);
+  const [lineSearch, setLineSearch] = useState("");
+  const [roadSeverityFilter, setRoadSeverityFilter] = useState<string | null>(null);
+  const [roadSearch, setRoadSearch] = useState("");
+
   const disrupted = useOsdkObjects(LineStatus, {
     where: { isDisrupted: { $eq: true } },
     orderBy: { statusSeverity: "asc" },
@@ -14,6 +21,61 @@ export default function TransportStatus() {
     orderBy: { timeToStationSeconds: "asc" },
     pageSize: 30,
   });
+
+  // Unique modes for filter pills
+  const modes = useMemo(() => {
+    const modeSet = new Set<string>();
+    (disrupted.data ?? []).forEach(line => {
+      if (line.mode) {
+        modeSet.add(line.mode);
+      }
+    });
+    return Array.from(modeSet).sort();
+  }, [disrupted.data]);
+
+  // Unique road severities
+  const roadSeverities = useMemo(() => {
+    const sevSet = new Set<string>();
+    (roads.data ?? []).forEach(road => {
+      if (road.statusSeverity) {
+        sevSet.add(road.statusSeverity);
+      }
+    });
+    return Array.from(sevSet).sort();
+  }, [roads.data]);
+
+  // Filtered disrupted lines
+  const filteredLines = useMemo(() => {
+    let data = disrupted.data ?? [];
+    if (modeFilter) {
+      data = data.filter(line => line.mode === modeFilter);
+    }
+    if (lineSearch) {
+      const term = lineSearch.toLowerCase();
+      data = data.filter(line => {
+        const name = (line.lineName ?? "").toLowerCase();
+        const reason = (line.disruptionReason ?? "").toLowerCase();
+        return name.includes(term) || reason.includes(term);
+      });
+    }
+    return data;
+  }, [disrupted.data, modeFilter, lineSearch]);
+
+  // Filtered roads
+  const filteredRoads = useMemo(() => {
+    let data = roads.data ?? [];
+    if (roadSeverityFilter) {
+      data = data.filter(road => road.statusSeverity === roadSeverityFilter);
+    }
+    if (roadSearch) {
+      const term = roadSearch.toLowerCase();
+      data = data.filter(road => {
+        const name = (road.roadName ?? "").toLowerCase();
+        return name.includes(term);
+      });
+    }
+    return data;
+  }, [roads.data, roadSeverityFilter, roadSearch]);
 
   const hasError = disrupted.error || roads.error || buses.error;
 
@@ -31,21 +93,52 @@ export default function TransportStatus() {
           <Icon icon="train" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
           Disrupted Lines
           {!disrupted.isLoading && (
-            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(disrupted.data ?? []).length}</Tag>
+            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{filteredLines.length}</Tag>
           )}
         </h4>
       </div>
+
+      {/* Mode filter pills + search */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        <Button
+          text="All Modes"
+          small
+          minimal={modeFilter !== null}
+          intent={modeFilter === null ? Intent.PRIMARY : Intent.NONE}
+          onClick={() => setModeFilter(null)}
+        />
+        {modes.map(m => (
+          <Button
+            key={m}
+            text={m}
+            small
+            minimal={modeFilter !== m}
+            intent={modeFilter === m ? Intent.PRIMARY : Intent.NONE}
+            onClick={() => setModeFilter(modeFilter === m ? null : m)}
+          />
+        ))}
+        <div style={{ flex: 1 }} />
+        <InputGroup
+          leftIcon="search"
+          placeholder="Search lines..."
+          value={lineSearch}
+          onChange={(e) => setLineSearch(e.target.value)}
+          small
+          style={{ width: 180 }}
+        />
+      </div>
+
       <Card className="panel-card" style={{ marginBottom: 20 }}>
         {disrupted.isLoading && !disrupted.data && (
           <div style={{ padding: 32, textAlign: "center" }}><Spinner /></div>
         )}
-        {(disrupted.data ?? []).length === 0 && !disrupted.isLoading && (
+        {filteredLines.length === 0 && !disrupted.isLoading && (
           <div className="empty-state">
             <Icon icon="tick-circle" size={24} />
-            <p>No disruptions currently reported</p>
+            <p>{modeFilter || lineSearch ? "No lines match the current filters" : "No disruptions currently reported"}</p>
           </div>
         )}
-        {(disrupted.data ?? []).length > 0 && (
+        {filteredLines.length > 0 && (
           <HTMLTable bordered striped style={{ width: "100%" }}>
             <thead>
               <tr>
@@ -57,7 +150,7 @@ export default function TransportStatus() {
               </tr>
             </thead>
             <tbody>
-              {(disrupted.data ?? []).map((line) => (
+              {filteredLines.map((line) => (
                 <tr key={line.lineId}>
                   <td><strong>{line.lineName ?? line.lineId}</strong></td>
                   <td>
@@ -88,24 +181,56 @@ export default function TransportStatus() {
               <Icon icon="drive-time" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
               Road Conditions
               {!roads.isLoading && (
-                <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(roads.data ?? []).length}</Tag>
+                <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{filteredRoads.length}</Tag>
               )}
             </h4>
           </div>
+
+          {/* Road filters */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+            <Button
+              text="All"
+              small
+              minimal={roadSeverityFilter !== null}
+              intent={roadSeverityFilter === null ? Intent.PRIMARY : Intent.NONE}
+              onClick={() => setRoadSeverityFilter(null)}
+            />
+            {roadSeverities.map(sev => (
+              <Button
+                key={sev}
+                text={sev}
+                small
+                minimal={roadSeverityFilter !== sev}
+                intent={roadSeverityFilter === sev ? (
+                  sev === "Serious" ? Intent.DANGER : sev === "Good" ? Intent.SUCCESS : Intent.PRIMARY
+                ) : Intent.NONE}
+                onClick={() => setRoadSeverityFilter(roadSeverityFilter === sev ? null : sev)}
+              />
+            ))}
+            <InputGroup
+              leftIcon="search"
+              placeholder="Search roads..."
+              value={roadSearch}
+              onChange={(e) => setRoadSearch(e.target.value)}
+              small
+              style={{ width: 140 }}
+            />
+          </div>
+
           <Card className="panel-card">
             {roads.isLoading && !roads.data && (
               <div style={{ padding: 24, textAlign: "center" }}><Spinner /></div>
             )}
-            {(roads.data ?? []).length === 0 && !roads.isLoading && (
-              <div className="empty-state">No road data available</div>
+            {filteredRoads.length === 0 && !roads.isLoading && (
+              <div className="empty-state">{roadSeverityFilter || roadSearch ? "No roads match filters" : "No road data available"}</div>
             )}
-            {(roads.data ?? []).length > 0 && (
+            {filteredRoads.length > 0 && (
               <HTMLTable bordered striped style={{ width: "100%" }}>
                 <thead>
                   <tr><th>Road</th><th>Severity</th><th>Status</th></tr>
                 </thead>
                 <tbody>
-                  {(roads.data ?? []).map((road) => (
+                  {filteredRoads.map((road) => (
                     <tr key={road.roadId}>
                       <td><strong>{road.roadName ?? road.roadId}</strong></td>
                       <td>

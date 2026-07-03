@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useMemo } from "react";
-import { Card, Tag, Intent, Spinner, HTMLTable, InputGroup, Callout, Icon, Button } from "@blueprintjs/core";
+import { Card, Tag, Intent, Spinner, HTMLTable, InputGroup, Callout, Icon, Button, ButtonGroup } from "@blueprintjs/core";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { LiveIncident } from "@crisis-logistics-command-app/sdk";
 
@@ -12,8 +12,6 @@ const SEVERITY_INTENT: Record<string, Intent> = {
   Minimal: Intent.NONE,
 };
 
-const PAGE_SIZE = 25;
-
 const SEVERITY_ORDER: Record<string, number> = {
   Severe: 1,
   Serious: 2,
@@ -21,38 +19,96 @@ const SEVERITY_ORDER: Record<string, number> = {
   Minimal: 4,
 };
 
+const SEVERITY_LEVELS = ["Severe", "Serious", "Moderate", "Minimal"];
+
+type SortField = "severity" | "updated";
 type SortDir = "asc" | "desc";
+
+const PAGE_SIZE = 25;
 
 export default function ActiveIncidents() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [severitySort, setSeveritySort] = useState<SortDir>("asc");
+
+  // Filters
+  const [severityFilters, setSeverityFilters] = useState<Set<string>>(new Set());
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+
+  // Sort
+  const [sortField, setSortField] = useState<SortField>("severity");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const incidents = useOsdkObjects(LiveIncident, {
     orderBy: { severityLevel: "asc" },
     pageSize: 200,
   });
 
+  // Unique incident types for filter
+  const incidentTypes = useMemo(() => {
+    const types = new Set<string>();
+    (incidents.data ?? []).forEach(inc => {
+      if (inc.incidentType) {
+        types.add(inc.incidentType);
+      }
+    });
+    return Array.from(types).sort();
+  }, [incidents.data]);
+
+  const toggleSeverityFilter = (sev: string) => {
+    setSeverityFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(sev)) { next.delete(sev); } else { next.add(sev); }
+      return next;
+    });
+  };
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
   const filtered = useMemo(() => {
     let data = (incidents.data ?? []).filter((inc) => {
-      if (!search) {
-        return true;
+      // Text search
+      if (search) {
+        const term = search.toLowerCase();
+        const desc = String(inc.description ?? "").toLowerCase();
+        const type = String(inc.incidentType ?? "").toLowerCase();
+        const sev = String(inc.severityLevel ?? "").toLowerCase();
+        if (!desc.includes(term) && !type.includes(term) && !sev.includes(term)) {
+          return false;
+        }
       }
-      const term = search.toLowerCase();
-      const desc = String(inc.description ?? "").toLowerCase();
-      const type = String(inc.incidentType ?? "").toLowerCase();
-      const sev = String(inc.severityLevel ?? "").toLowerCase();
-      return desc.includes(term) || type.includes(term) || sev.includes(term);
+      // Severity filter
+      if (severityFilters.size > 0 && !severityFilters.has(inc.severityLevel ?? "")) {
+        return false;
+      }
+      // Type filter
+      if (typeFilter && inc.incidentType !== typeFilter) {
+        return false;
+      }
+      return true;
     });
-    // Sort by severity
+
+    // Sort
     data = [...data].sort((a, b) => {
-      const aOrder = SEVERITY_ORDER[a.severityLevel ?? ""] ?? 5;
-      const bOrder = SEVERITY_ORDER[b.severityLevel ?? ""] ?? 5;
-      return severitySort === "asc" ? aOrder - bOrder : bOrder - aOrder;
+      if (sortField === "severity") {
+        const aOrder = SEVERITY_ORDER[a.severityLevel ?? ""] ?? 5;
+        const bOrder = SEVERITY_ORDER[b.severityLevel ?? ""] ?? 5;
+        return sortDir === "asc" ? aOrder - bOrder : bOrder - aOrder;
+      } else {
+        const aTime = a.polledAt != null ? new Date(a.polledAt).getTime() : 0;
+        const bTime = b.polledAt != null ? new Date(b.polledAt).getTime() : 0;
+        return sortDir === "asc" ? aTime - bTime : bTime - aTime;
+      }
     });
     return data;
-  }, [incidents.data, search, severitySort]);
+  }, [incidents.data, search, severityFilters, typeFilter, sortField, sortDir]);
 
   const visible = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
@@ -61,11 +117,14 @@ export default function ActiveIncidents() {
     [incidents.data, selectedId]
   );
 
+  const activeFilterCount = severityFilters.size + (typeFilter ? 1 : 0) + (search ? 1 : 0);
+
   return (
     <div className="split-layout split-layout-master-detail" style={{ height: "calc(100vh - 160px)" }}>
       {/* Left: Incident Table */}
       <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexShrink: 0 }}>
+        {/* Search + count */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexShrink: 0 }}>
           <span style={{ fontWeight: 600, fontSize: 14, color: "#1c2127" }}>
             Incidents ({filtered.length})
           </span>
@@ -77,6 +136,60 @@ export default function ActiveIncidents() {
             style={{ width: 220 }}
             small
           />
+        </div>
+
+        {/* Filter bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap", flexShrink: 0 }}>
+          {/* Severity chips */}
+          {SEVERITY_LEVELS.map(sev => (
+            <Tag
+              key={sev}
+              interactive
+              intent={severityFilters.has(sev) ? SEVERITY_INTENT[sev] : Intent.NONE}
+              minimal={!severityFilters.has(sev)}
+              onClick={() => { toggleSeverityFilter(sev); setVisibleCount(PAGE_SIZE); }}
+              style={{ cursor: "pointer", fontSize: 11 }}
+            >
+              {sev}
+            </Tag>
+          ))}
+
+          <div style={{ width: 1, height: 16, background: "#d8e1e8" }} />
+
+          {/* Type filter dropdown as pills */}
+          <ButtonGroup minimal>
+            <Button
+              text="All Types"
+              small
+              active={typeFilter === null}
+              intent={typeFilter === null ? Intent.PRIMARY : Intent.NONE}
+              onClick={() => { setTypeFilter(null); setVisibleCount(PAGE_SIZE); }}
+            />
+            {incidentTypes.slice(0, 5).map(t => (
+              <Button
+                key={t}
+                text={t}
+                small
+                active={typeFilter === t}
+                intent={typeFilter === t ? Intent.PRIMARY : Intent.NONE}
+                onClick={() => { setTypeFilter(typeFilter === t ? null : t); setVisibleCount(PAGE_SIZE); }}
+              />
+            ))}
+          </ButtonGroup>
+
+          {activeFilterCount > 0 && (
+            <>
+              <div style={{ flex: 1 }} />
+              <Button
+                small
+                minimal
+                intent={Intent.WARNING}
+                icon="filter-remove"
+                text="Clear"
+                onClick={() => { setSeverityFilters(new Set()); setTypeFilter(null); setSearch(""); }}
+              />
+            </>
+          )}
         </div>
 
         {incidents.error && (
@@ -94,13 +207,18 @@ export default function ActiveIncidents() {
               <tr>
                 <th
                   style={{ cursor: "pointer", userSelect: "none" }}
-                  onClick={() => setSeveritySort(prev => prev === "asc" ? "desc" : "asc")}
+                  onClick={() => toggleSort("severity")}
                 >
-                  Severity <Icon icon={severitySort === "asc" ? "sort-asc" : "sort-desc"} size={12} />
+                  Severity {sortField === "severity" && <Icon icon={sortDir === "asc" ? "sort-asc" : "sort-desc"} size={12} />}
                 </th>
                 <th>Type</th>
                 <th>Description</th>
-                <th>Updated</th>
+                <th
+                  style={{ cursor: "pointer", userSelect: "none" }}
+                  onClick={() => toggleSort("updated")}
+                >
+                  Updated {sortField === "updated" && <Icon icon={sortDir === "asc" ? "sort-asc" : "sort-desc"} size={12} />}
+                </th>
               </tr>
             </thead>
             <tbody>
