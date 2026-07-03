@@ -1,48 +1,184 @@
-# crisis-logistics-command-app
+# 🚨 Crisis Logistics Command Center
 
-This project was generated with [`@osdk/create-app`](https://www.npmjs.com/package/@osdk/create-app) and demonstrates using the Ontology SDK package `@crisis-logistics-command-app/sdk` with React on top of Vite. Check out the [Vite](https://vitejs.dev/guide/) docs for further configuration.
+A real-time operational dashboard for monitoring and managing crisis logistics across London, built with **React 19**, **Palantir's Ontology SDK (OSDK)**, and **Leaflet maps**.
 
-## Developing locally
+![React](https://img.shields.io/badge/React-19-blue) ![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue) ![Vite](https://img.shields.io/badge/Vite-7-purple) ![Blueprint](https://img.shields.io/badge/BlueprintJS-6-green)
 
-A `FOUNDRY_TOKEN` environment variable is required to authenticate with the NPM registry. When developing locally you may use the token used to git clone the repository (may only be valid for 7 days), or generate a longer lived token [inside Foundry](https://www.palantir.com/docs/foundry/platform-security-third-party/user-generated-tokens/#generation).
+## 🎯 Overview
 
-Install project dependencies:
+The Crisis Logistics Command Center provides real-time situational awareness for crisis management teams. It aggregates live data from Transport for London (TfL), Google Maps Platform, and custom Ontology objects to deliver:
 
-```sh
-npm install
+- **Live incident tracking** with severity-based visualization on an interactive map
+- **Transport network monitoring** including tube lines, roads, and bus arrivals
+- **Resource inventory management** with CRUD operations and low-stock alerts
+- **Route analytics** with travel times and journey planning data
+- **Air quality monitoring** with current and forecasted conditions
+
+## 🏗️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Framework** | React 19 + TypeScript 5.5 |
+| **Build** | Vite 7 |
+| **UI Components** | BlueprintJS 6 (Palantir's design system) |
+| **Data Layer** | Palantir OSDK (`@osdk/react` experimental hooks) |
+| **Maps** | Leaflet + react-leaflet 5 (CartoDB Voyager tiles) |
+| **Routing** | react-router-dom 6 |
+| **Auth** | OAuth 2.0 via `@osdk/oauth` |
+| **Hosting** | Palantir Foundry Website Hosting |
+
+## 📁 Project Structure
+
+```
+src/
+├── main.tsx                    # App entry — OsdkProvider2, CSS imports
+├── client.ts                   # OSDK OAuth client setup
+├── router.tsx                  # Routes: / and /auth/callback
+├── AuthCallback.tsx            # OAuth callback handler
+├── Home.tsx                    # Main layout — Navbar + 5 Tabs
+├── Home.css                    # Tab & navbar styling
+├── index.css                   # Global styles, grid layouts, histograms
+│
+├── components/
+│   ├── CrisisMap.tsx           # Leaflet map with severity markers, legend, reset
+│   ├── ErrorBoundary.tsx       # Global error boundary
+│   └── Loading.tsx             # Loading spinner
+│
+└── pages/
+    ├── Dashboard.tsx           # Tab 1: Situation Overview (map + histograms + metrics)
+    ├── ActiveIncidents.tsx     # Tab 2: Incident table with detail panel + mini-map
+    ├── TransportStatus.tsx     # Tab 3: Disrupted lines, roads, bus arrivals
+    ├── ResourcesFleet.tsx      # Tab 4: Resource CRUD + fleet monitoring
+    └── Analytics.tsx           # Tab 5: Travel times, journey plans, air quality
 ```
 
-Run the following command from the project root to start a local development server on `http://localhost:8080`:
+## 🗄️ Ontology Data Model
 
-```sh
+### Object Types (10)
+
+| Object Type | Primary Key | Description |
+|-------------|-------------|-------------|
+| `LiveIncident` | `incidentId` | TfL road/transport incidents with severity and geolocation |
+| `LiveLocation` | `locationId` | Key infrastructure points (hospitals, stations, etc.) |
+| `LiveTransportUnit` | `unitId` | Fleet vehicles with status and GPS positions |
+| `LineStatus` | `lineId` | Tube/rail/bus line disruption status |
+| `RoadStatus` | `roadId` | Major road conditions |
+| `BusArrival` | `vehicleId` | Real-time bus arrival predictions |
+| `CrisisResource` | `resourceId` | Inventory items (medical kits, water, blankets) |
+| `TravelTime` | `pairId` | Calculated travel times between hubs and incidents |
+| `JourneyPlan` | `journeyId` | Multi-modal route plans |
+| `AirQuality` | `forecastType` | Current and forecasted air quality bands |
+
+### Action Types (3)
+
+| Action | Description |
+|--------|-------------|
+| **Create Crisis Resource** | Add new inventory items to a location |
+| **Update Resource Inventory** | Modify quantity of existing resources |
+| **Delete Crisis Resource** | Remove a resource record |
+
+## 🖥️ Application Tabs
+
+### Tab 1: Situation Overview
+Three-column layout with interactive histogram filters on each side and a Leaflet map in the center. Features:
+- **Multi-select** incident type and location category histograms
+- **Severity filter chips** (Severe / Serious / Moderate / Minimal)
+- **Time range filter** (All Time / 1h / 6h / 24h / 7d)
+- **4 bottom metric cards** (incidents, disrupted lines, low resources, transport units)
+- **Reset view button** (⌂) to restore default map bounds
+
+### Tab 2: Active Incidents
+Master-detail split layout:
+- Left: searchable, sortable incident table with severity filter chips and type dropdown
+- Right: selected incident detail panel with description, metadata, and a mini-map that flies to the incident location
+
+### Tab 3: Transport Status
+- **Full-width disrupted lines** table with mode filter pills and search
+- **Two-column bottom**: road status (with severity filter + search) and bus arrivals
+
+### Tab 4: Resources & Fleet
+- **Resources section**: type filter pills, "Low Stock Only" toggle, sortable quantity column, inline create form, edit/delete actions via OSDK
+- **Fleet section**: vehicle type filter pills, status indicators
+
+### Tab 5: Analytics
+- **3 metric cards**: Air Quality, Avg Travel Time, Routes Calculated
+- **Travel Times table**: sortable by travel time, searchable by hub name
+- **Journey Plans table**: sortable by duration, filterable by transport mode
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 24+ (see `.nvmrc`)
+- Access to a Palantir Foundry instance with the Crisis Logistics ontology
+
+### Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server on http://localhost:8080
 npm run dev
 ```
 
-Development configuration is stored in `.env.development`.
+### Code Workspaces Development
 
-In order to make API requests to Foundry, CORS must be configured for the stack to allow `http://localhost:8080` to load resources. The configured OAuth client must also allow `http://localhost:8080/auth/callback` as a redirect URL.
-
-## Developing with Code Workspaces
-
-Run the following command in a VS Code workspace terminal from the project root to start a development server on the workspace:
-
-```sh
+```bash
 npm run dev:remote
 ```
 
-Open the preview panel to see the application from the development server.
+### Building
 
-## Deploying
-
-Foundry CI has been configured to automatically deploy production builds of this project to Foundry website hosting whenever git tags are pushed.
-
+```bash
+npm run build
 ```
+
+### Deploying
+
+Production deployments are handled automatically via Foundry CI when git tags are pushed:
+
+```bash
 git tag <x.y.z>
 git push origin tag <x.y.z>
 ```
 
-By default, a new site version will be uploaded and deployed as the production version immediately. If instead, you prefer to only upload the version and manually deploy it as the production version later you can set the `site.uploadOnly` property in the `foundry.config.json` file to `true`.
+## ⚙️ Configuration
 
-Production configuration is stored in `.env.production`. A default test is included in `env.test.ts` to verify your production environment variables which runs in Foundry CI whenever git tags are pushed by setting the environment variable `VERIFY_ENV_PRODUCTION=true`.
+### Environment Variables
 
-If you did not yet register a subdomain for Foundry website hosting you will need to first do so and then fill in the `VITE_FOUNDRY_REDIRECT_URL` in `.env.production`. The configured OAuth client must also allow the auth callback on the subdomain as a redirect URL.
+| Variable | Description |
+|----------|-------------|
+| `VITE_FOUNDRY_API_URL` | Foundry instance URL |
+| `VITE_FOUNDRY_CLIENT_ID` | OAuth client ID from Developer Console |
+| `VITE_FOUNDRY_REDIRECT_URL` | OAuth callback URL |
+| `VITE_FOUNDRY_ONTOLOGY_RID` | Ontology RID for OSDK |
+
+### CSP (Content Security Policy)
+
+For map tiles to load, the following must be added to **Developer Console → Website Hosting → Advanced → imgSrc**:
+
+```
+https://*.basemaps.cartocdn.com
+```
+
+## 📊 Data Sources
+
+| Source | Data |
+|--------|------|
+| **TfL Unified API** | Incidents, line status, road status, bus arrivals |
+| **Google Maps Platform** | Travel times, distance calculations, journey planning |
+| **Manual Entry** | Crisis resources (via OSDK Actions) |
+| **Air Quality API** | London air quality forecasts |
+
+## 🛠️ Key Technical Decisions
+
+1. **`@osdk/react` experimental hooks** (`useOsdkObjects`, `useOsdkAction`) — provides reactive data fetching with automatic caching
+2. **Leaflet over Google Maps** — Google Maps blocked by CSP `script-src 'self'`; Leaflet works with `img-src` CSP for tile loading
+3. **Client-side filtering and sorting** — all data loaded via OSDK, then filtered/sorted in-memory for instant UI response
+4. **BlueprintJS** — Palantir's own design system ensures visual consistency with Foundry Workshop
+5. **Lazy-loaded map** — `CrisisMap` uses `React.lazy()` to avoid blocking initial page load
+
+## 📝 License
+
+This project is proprietary and built on Palantir Foundry.
