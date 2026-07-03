@@ -46,6 +46,28 @@ const SEVERITY_ORDER: Record<string, number> = {
   Minimal: 3,
 };
 
+// ─── MapUpdater: fly to new center when props change ───
+function MapUpdater({ center, zoom }: { center?: [number, number]; zoom?: number }) {
+  const map = useMap();
+  const prevCenter = useRef<[number, number] | undefined>(undefined);
+
+  useEffect(() => {
+    if (!center) return;
+    // Only fly if center actually changed
+    if (
+      prevCenter.current &&
+      prevCenter.current[0] === center[0] &&
+      prevCenter.current[1] === center[1]
+    ) {
+      return;
+    }
+    prevCenter.current = center;
+    map.flyTo(center, zoom ?? 15, { duration: 0.8 });
+  }, [center, zoom, map]);
+
+  return null;
+}
+
 // ─── FitBounds component ───
 function FitBounds({ incidents, locations }: { incidents: IncidentData[]; locations: LocationData[] }) {
   const map = useMap();
@@ -119,6 +141,7 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
           subdomains="abcd"
         />
 
+        {center != null && <MapUpdater center={mapCenter} zoom={mapZoom} />}
         {center == null && <FitBounds incidents={incidents} locations={locations} />}
 
         {/* Location markers */}
