@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
+import { MapContainer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 
 // ─── Types ───
@@ -46,9 +46,69 @@ const SEVERITY_ORDER: Record<string, number> = {
   Minimal: 3,
 };
 
-// CartoDB Voyager - colorful map tiles (proven to work via img-src CSP)
-const TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';
+// ─── Fetch-to-Blob TileLayer ───
+// CSP blocks img-src for external domains but allows blob:
+// So we fetch tiles via connect-src and serve them as blob URLs
+const BlobTileLayer = L.TileLayer.extend({
+  createTile: function (
+    this: L.TileLayer & { getTileUrl(coords: L.Coords): string; _tileOnError(done: unknown, tile: HTMLElement, e: unknown): void },
+    coords: L.Coords,
+    done: (error: Error | null, tile: HTMLElement) => void
+  ): HTMLElement {
+    const tile = document.createElement("img") as HTMLImageElement;
+    tile.setAttribute("role", "presentation");
+
+    const url = this.getTileUrl(coords);
+
+    fetch(url)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("fetch failed");
+        }
+        return response.blob();
+      })
+      .then((blob) => {
+        tile.src = URL.createObjectURL(blob);
+        done(null, tile);
+      })
+      .catch(() => {
+        // If fetch also fails (connect-src blocked), show empty tile
+        tile.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+        done(null, tile);
+      });
+
+    return tile;
+  },
+});
+
+// ─── Component: Add blob tile layer to map ───
+function BlobTiles() {
+  const map = useMap();
+  const layerRef = useRef<L.TileLayer | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const layer = new (BlobTileLayer as any)(
+      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19,
+        subdomains: "abcd",
+      }
+    ) as L.TileLayer;
+
+    layerRef.current = layer;
+    layer.addTo(map);
+
+    return () => {
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+      }
+    };
+  }, [map]);
+
+  return null;
+}
 
 // ─── FitBounds component ───
 function FitBounds({ incidents, locations }: { incidents: IncidentData[]; locations: LocationData[] }) {
@@ -92,9 +152,7 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
     [incidents]
   );
 
-  const mapCenter: [number, number] = center
-    ? [center.lat, center.lng]
-    : LONDON_CENTER;
+  const mapCenter: [number, number] = center ? [center.lat, center.lng] : LONDON_CENTER;
   const mapZoom = zoom ?? DEFAULT_ZOOM;
 
   return (
@@ -117,11 +175,10 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
         zoomControl={true}
         scrollWheelZoom={true}
       >
-        <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} maxZoom={19} />
-
+        <BlobTiles />
         {center == null && <FitBounds incidents={incidents} locations={locations} />}
 
-        {/* Location markers (grey, subtle) */}
+        {/* Location markers */}
         {locations.map((loc) => {
           if (loc.latitude == null || loc.longitude == null) {
             return null;
@@ -141,7 +198,7 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
           );
         })}
 
-        {/* Incident markers (severity-colored, prominent) */}
+        {/* Incident markers */}
         {sortedIncidents.map((inc) => {
           if (inc.latitude == null || inc.longitude == null) {
             return null;
@@ -167,7 +224,7 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
         })}
       </MapContainer>
 
-      {/* Severity Legend */}
+      {/* Legend */}
       <div
         style={{
           position: "absolute",
@@ -189,13 +246,8 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
           <span key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span
               style={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background: clr,
-                border: "1.5px solid #fff",
-                boxShadow: "0 0 2px rgba(0,0,0,0.3)",
-                display: "inline-block",
+                width: 10, height: 10, borderRadius: "50%", background: clr,
+                border: "1.5px solid #fff", boxShadow: "0 0 2px rgba(0,0,0,0.3)", display: "inline-block",
               }}
             />
             {label}
