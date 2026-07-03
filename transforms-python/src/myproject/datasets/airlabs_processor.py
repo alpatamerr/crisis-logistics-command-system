@@ -64,6 +64,7 @@ def _parse_flights(flights, current_time):
         rows.append({
             "unit_id": str(hex_id) if hex_id else None,
             "vehicle_type": vehicle_type,
+            "aircraft_icao": aircraft_icao,
             "latitude": float(lat) if lat is not None else None,
             "longitude": float(lng) if lng is not None else None,
             "status": status,
