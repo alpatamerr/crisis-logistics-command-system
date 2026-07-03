@@ -1,0 +1,264 @@
+# Crisis Logistics Command System
+
+A real-time crisis logistics management platform built on Palantir Foundry, providing unified situational awareness across transport networks, incident tracking, resource management, and fleet operations for West London.
+
+![Platform](https://img.shields.io/badge/Platform-Palantir%20Foundry-black)
+![Language](https://img.shields.io/badge/Transforms-Python%20%7C%20Polars-blue)
+![Functions](https://img.shields.io/badge/Functions-TypeScript%20V2-purple)
+![APIs](https://img.shields.io/badge/APIs-TfL%20%7C%20Google%20Maps%20%7C%20Airlabs-green)
+
+---
+
+## Overview
+
+The Crisis Logistics Command System is an operational dashboard designed for crisis coordinators managing transport disruptions, resource allocation, and fleet positioning across seven West London boroughs: **Brent, Harrow, Ealing, Hammersmith & Fulham, Hillingdon, Hounslow, and Richmond upon Thames**.
+
+### Key Capabilities
+
+- **Real-time incident tracking** from TfL disruption feeds
+- **Multi-modal transport monitoring** (bus, tube, rail, road, cycling, aviation)
+- **Helicopter detection** via ICAO aircraft type cross-referencing
+- **Resource inventory management** with threshold alerting
+- **Journey planning** with public transport routing between hubs and incidents
+- **Air quality monitoring** with live TfL forecasts
+- **Travel time analytics** via Google Distance Matrix API
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        DATA SOURCES (APIs)                           │
+├──────────────────┬──────────────────────┬───────────────────────────┤
+│   TfL Open Data  │  Google Maps Platform │     Airlabs Aviation     │
+│  - Disruptions   │  - Distance Matrix    │  - Flight Positions      │
+│  - Line Status   │  - Route Directions   │  - ICAO Type Codes       │
+│  - Road Status   │                       │  - Helicopter Detection  │
+│  - Bus Arrivals  │                       │                          │
+│  - Vehicle Pos.  │                       │                          │
+│  - Journey Plans │                       │                          │
+│  - Air Quality   │                       │                          │
+│  - Bikepoints    │                       │                          │
+│  - Stations      │                       │                          │
+└──────────────────┴──────────────────────┴───────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     TRANSFORM LAYER (Python/Polars)                  │
+├─────────────────────────────────────────────────────────────────────┤
+│  01_raw_ingestion    → External API calls, response parsing         │
+│  02_clean_derived    → Deduplication, caching, enrichment           │
+│  03_ontology_backings → Unified schemas for object types            │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      ONTOLOGY LAYER (10 Object Types)                │
+├─────────────────────────────────────────────────────────────────────┤
+│  Live Incident │ Location │ Transport Unit │ Line Status │ Road     │
+│  Bus Arrival   │ Crisis Resource │ Travel Time │ Journey Plan │ Air │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   APPLICATION LAYER (Workshop)                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  Tab 1: Situation Map    │  Tab 2: Active Incidents                 │
+│  Tab 3: Transport Status │  Tab 4: Resources & Fleet               │
+│  Tab 5: Analytics        │                                          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Data Sources
+
+| Source | API | Refresh Rate | Purpose |
+|--------|-----|-------------|---------|
+| **TfL Open Data** | `api.tfl.gov.uk` | 15 min | Transport disruptions, line/road status, bus arrivals, journey planning, air quality, bikepoints, stations |
+| **Google Maps Platform** | Distance Matrix API | Hourly | Travel times from logistics hubs to incident sites |
+| **Airlabs** | `airlabs.co/api/v9/flights` | 15 min | Aircraft positions with ICAO type identification for helicopter detection |
+
+### Bounding Box
+
+```
+Latitude:  51.38 — 51.63
+Longitude: -0.51 — -0.17
+```
+
+---
+
+## Object Types
+
+| Object Type | API Name | Description | Backing Dataset |
+|-------------|----------|-------------|-----------------|
+| **Live Incident** | `LiveIncident` | TfL traffic disruptions and incidents | `current_incidents` |
+| **Location** | `LiveLocation` | Infrastructure points (hospitals, stations, fire stations) | `unified_locations` |
+| **Transport Unit** | `LiveTransportUnit` | Unified fleet (aircraft, buses, bikes, trains, tubes) | `unified_fleet` |
+| **Line Status** | `LineStatus` | Tube/bus/rail line disruption status | `tfl_line_status` |
+| **Road Status** | `RoadStatus` | Major road conditions | `tfl_road_status` |
+| **Bus Arrival** | `BusArrival` | Real-time bus arrival predictions | `tfl_bus_arrivals` |
+| **Crisis Resource** | `CrisisResource` | Editable resource inventory (water, blankets, etc.) | Edits-based |
+| **Travel Time** | `TravelTime` | Distance Matrix results (hub → incident) | `travel_time_matrix` |
+| **Journey Plan** | `JourneyPlan` | Public transport routes (hub → hotspot) | `tfl_journey_plans` |
+| **Air Quality** | `AirQuality` | London air quality forecast bands | `tfl_air_quality` |
+
+---
+
+## Workshop Application (5 Tabs)
+
+### Tab 1: Situation Map
+- Interactive map with dual layers: Incidents (severity-colored triangles) + Locations (subtle grey dots)
+- TYPE and CATEGORY filter histograms
+- KPI metrics: Disrupted Lines, Active Incidents, Low Resources, Transport Units
+
+### Tab 2: Active Incidents
+- Sortable incident log with severity prioritization
+- Detail panel with properties, description, and mini-map
+
+### Tab 3: Transport Status
+- Disrupted Lines table (filtered to disrupted only)
+- Road Conditions table
+- Bus Arrivals table (sorted by ETA)
+
+### Tab 4: Resources & Fleet
+- Crisis Resource CRUD (Create, Update, Delete actions)
+- Transport Unit fleet overview with vehicle type filter
+
+### Tab 5: Analytics
+- Travel Time Matrix (hub → incident distances)
+- Journey Plans (public transport routing)
+- Metrics: Air Quality Band, Avg Travel Time, Routes Calculated
+
+---
+
+## Functions (TypeScript V2)
+
+| Function | Purpose | Output |
+|----------|---------|--------|
+| `isBelowThreshold` | Function-backed column: identifies resources below critical threshold | `Record<ObjectSpecifier<CrisisResource>, {isBelowThreshold: boolean}>` |
+| `countLowResources` | Metric: counts total resources needing resupply | `Integer` |
+
+### Logic
+```typescript
+// Resource is "low" when:
+quantityUnits < criticalThreshold
+```
+
+---
+
+## Helicopter Detection
+
+Aircraft are classified using ICAO type designator cross-referencing:
+
+```python
+HELICOPTER_ICAO_CODES = {
+    # Airbus Helicopters
+    "EC35", "H135", "H145", "H160", "H175", "H225",
+    # Leonardo/AgustaWestland
+    "A109", "A139", "A169", "A189",
+    # Bell
+    "B206", "B407", "B412", "B429",
+    # Robinson
+    "R22", "R44", "R66",
+    # Sikorsky
+    "S76", "S92",
+    # ... 60+ total codes
+}
+```
+
+When Airlabs returns a flight with `aircraft_icao` matching a helicopter code, it's classified as `vehicle_type = "HELICOPTER"` instead of `"AIRCRAFT"` in the unified fleet.
+
+---
+
+## Schedules
+
+| Schedule | Frequency | Datasets |
+|----------|-----------|----------|
+| **Real-Time West London Feeds** | Every 15 min | incidents, line status, road status, bikepoints, raw incidents |
+| **Transport Tracking** | Every 15 min | bus arrivals, vehicle positions |
+| **Analytics Feeds** | Hourly | journey plans, air quality, travel time matrix |
+
+---
+
+## Project Structure
+
+```
+transforms-python/
+├── src/myproject/datasets/
+│   ├── airlabs_processor.py          # Airlabs flights + helicopter detection
+│   ├── tfl_incident_processor.py     # TfL disruptions
+│   ├── tfl_line_status_processor.py  # Line status
+│   ├── tfl_road_status_processor.py  # Road conditions
+│   ├── tfl_bus_arrivals_processor.py # Bus ETAs
+│   ├── tfl_vehicle_positions.py      # Bus positions
+│   ├── tfl_train_positions.py        # Train positions
+│   ├── tfl_journey_planner_processor.py # Journey planning
+│   ├── tfl_air_quality_processor.py  # Air quality
+│   ├── tfl_bikepoints_processor.py   # Bike docks
+│   ├── tfl_stations_processor.py     # Stations
+│   ├── travel_time_matrix.py         # Google Distance Matrix
+│   ├── route_directions.py           # Google Directions
+│   ├── infrastructure_discovery.py   # Nearby infrastructure
+│   ├── unified_fleet.py              # Fleet aggregation
+│   ├── unified_locations.py          # Location aggregation
+│   └── current_incidents.py          # Incident aggregation
+├── conda_recipe/meta.yaml            # Dependencies
+└── README.md
+```
+
+---
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| **Platform** | Palantir Foundry |
+| **Transforms** | Python 3.11+ / Polars / Pandas |
+| **Functions** | TypeScript V2 (`@osdk/functions`) |
+| **Application** | Foundry Workshop |
+| **Compute** | Lightweight (single-node) transforms |
+| **External APIs** | TfL, Google Maps, Airlabs |
+| **Scheduling** | Foundry Scheduler (cron-based) |
+
+---
+
+## Action Types
+
+| Action | Description |
+|--------|-------------|
+| **Create Crisis Resource** | Add new resource to inventory |
+| **Update Resource Inventory** | Modify quantity/threshold |
+| **Delete Crisis Resource** | Remove resource from tracking |
+
+---
+
+## Setup Requirements
+
+1. **API Keys Required:**
+   - TfL Open Data (free, register at `api.tfl.gov.uk`)
+   - Google Maps Platform (Distance Matrix API enabled)
+   - Airlabs (free tier supports flights endpoint)
+
+2. **Foundry Data Connection Sources:**
+   - TfL source with API key configured
+   - Google Maps source with API key configured
+   - Airlabs source with API key configured
+
+3. **Ontology Configuration:**
+   - 10 object types (see Object Types section)
+   - 3 action types for Crisis Resource CRUD
+   - 2 TypeScript V2 functions for threshold detection
+
+---
+
+## Attribution
+
+Data sources: **TfL Open Data** (Contains OS data © Crown copyright and database rights) · **Google Maps Platform** · **Airlabs Aviation Data**
+
+---
+
+## License
+
+Proprietary — built for demonstration purposes.
