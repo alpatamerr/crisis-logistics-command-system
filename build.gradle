@@ -1,0 +1,21 @@
+buildscript {
+    repositories {
+        maven {
+            credentials {
+                username ''
+                password bearerToken
+            }
+            authentication {
+                basic(BasicAuthentication)
+            }
+            url "${project.artifactsApiUri}/repositories/${repositoryRid}/contents/release/maven"
+        }
+    }
+
+    dependencies {
+        classpath "com.palantir.functions.gradle:functions-common-gradle-plugins:${functionsGradleVersion}"
+        classpath "com.palantir.functions:functions-typescript-gradle-plugin:${functionsTypescriptVersion}"
+    }
+}
+
+apply plugin: "com.palantir.functions.root"

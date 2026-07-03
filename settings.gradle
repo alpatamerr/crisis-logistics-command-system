@@ -1,0 +1,9 @@
+// DO NOT MODIFY THIS FILE
+// Replace all non-alphanumeric characters with dashes, and remove repeating dashes
+rootProject.name = repositoryName.toLowerCase().replaceAll("[^a-z0-9]", "-").replaceAll("-+", "-")
+
+rootProject.projectDir.eachDir { dir ->
+    if (file("${dir}/build.gradle").exists()) {
+        include dir.name
+    }
+}
