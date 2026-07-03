@@ -27,8 +27,6 @@ const ontologyRid = getMetaTagContent("osdk-ontologyRid");
 const scopes = [
   "api:use-ontologies-read",
   "api:use-ontologies-write",
-  "api:use-mediasets-read",
-  "api:use-mediasets-write",
 ];
 
 export const auth: PublicOauthClient = createPublicOauthClient(

@@ -1,0 +1,50 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-navbar {
+  background: #1c2127 !important;
+}
+
+.nav-icon {
+  color: #ff6b6b;
+  margin-right: 8px;
+}
+
+.nav-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: 16px;
+  margin: 0;
+}
+
+.app-content {
+  flex: 1;
+  padding: 60px 16px 16px 16px;
+  overflow-y: auto;
+  background: #f6f7f9;
+}
+
+.app-tabs .bp5-tab-list {
+  background: #fff;
+  padding: 0 16px;
+  border-bottom: 1px solid #e1e8ed;
+  border-radius: 6px 6px 0 0;
+}
+
+.app-tabs .bp5-tab-panel {
+  margin-top: 0;
+  padding: 16px 0;
+}
+
+.app-footer {
+  padding: 8px 16px;
+  text-align: center;
+  font-size: 11px;
+  color: #8a9ba8;
+  font-style: italic;
+  background: #fff;
+  border-top: 1px solid #e1e8ed;
+}
