@@ -6,45 +6,59 @@
 
 .app-navbar {
   background: #1c2127 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+  z-index: 10;
 }
 
 .nav-icon {
   color: #ff6b6b;
-  margin-right: 8px;
+  margin-right: 10px;
 }
 
 .nav-title {
-  color: #fff;
+  color: #f5f8fa;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 15px;
   margin: 0;
+  letter-spacing: -0.2px;
 }
 
 .app-content {
   flex: 1;
-  padding: 60px 16px 16px 16px;
+  padding: 56px 20px 16px 20px;
   overflow-y: auto;
-  background: #f6f7f9;
+  background: #f0f2f5;
 }
 
 .app-tabs .bp5-tab-list {
   background: #fff;
-  padding: 0 16px;
-  border-bottom: 1px solid #e1e8ed;
-  border-radius: 6px 6px 0 0;
+  padding: 0 20px;
+  border-bottom: 2px solid #e1e8ed;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.app-tabs .bp5-tab {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+}
+
+.app-tabs .bp5-tab[aria-selected="true"] {
+  color: #2d72d2;
 }
 
 .app-tabs .bp5-tab-panel {
   margin-top: 0;
-  padding: 16px 0;
+  padding: 20px 0;
 }
 
 .app-footer {
-  padding: 8px 16px;
+  padding: 6px 16px;
   text-align: center;
-  font-size: 11px;
-  color: #8a9ba8;
+  font-size: 10px;
+  color: #a7b6c2;
   font-style: italic;
-  background: #fff;
-  border-top: 1px solid #e1e8ed;
+  background: #1c2127;
+  letter-spacing: 0.2px;
 }

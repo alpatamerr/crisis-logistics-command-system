@@ -5,33 +5,86 @@
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
-  background: #f6f7f9;
+  background: #f0f2f5;
+  color: #1c2127;
 }
 
+/* Metric Cards Grid */
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 .metric-card {
   text-align: center;
-  padding: 20px !important;
+  padding: 20px 16px !important;
+  border-radius: 8px !important;
+  transition: box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
 }
 
 .metric-value {
   font-size: 28px;
   font-weight: 700;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+}
+
+.metric-value .bp5-tag {
+  font-size: 24px;
+  padding: 4px 12px;
 }
 
 .metric-title {
-  font-size: 13px;
-  color: #5c7080;
+  font-size: 11px;
+  color: #738694;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
+  font-weight: 600;
 }
 
+/* Table Containers */
 .table-container {
   overflow-x: auto;
+}
+
+.bp5-html-table {
+  font-size: 13px;
+}
+
+.bp5-html-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #5c7080;
+  font-weight: 600;
+}
+
+/* Section Headers */
+.bp5-heading {
+  color: #1c2127;
+  font-weight: 600;
+}
+
+/* Cards */
+.bp5-card {
+  border-radius: 8px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c7cd;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }

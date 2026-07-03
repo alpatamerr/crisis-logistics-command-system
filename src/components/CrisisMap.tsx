@@ -18,7 +18,7 @@ export default function CrisisMap() {
   const locations = useOsdkObjects(LiveLocation, { pageSize: 200 });
 
   return (
-    <div style={{ height: 450, borderRadius: 6, overflow: "hidden", border: "1px solid #e1e8ed" }}>
+    <div style={{ height: 500, borderRadius: 8, overflow: "hidden", border: "1px solid #d3d8de", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
       <MapContainer center={WEST_LONDON_CENTER} zoom={ZOOM} style={{ height: "100%", width: "100%" }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
