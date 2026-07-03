@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef } from "react";
-import { MapContainer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 
 // ─── Types ───
@@ -45,70 +45,6 @@ const SEVERITY_ORDER: Record<string, number> = {
   Moderate: 2,
   Minimal: 3,
 };
-
-// ─── Fetch-to-Blob TileLayer ───
-// CSP blocks img-src for external domains but allows blob:
-// So we fetch tiles via connect-src and serve them as blob URLs
-const BlobTileLayer = L.TileLayer.extend({
-  createTile: function (
-    this: L.TileLayer & { getTileUrl(coords: L.Coords): string; _tileOnError(done: unknown, tile: HTMLElement, e: unknown): void },
-    coords: L.Coords,
-    done: (error: Error | null, tile: HTMLElement) => void
-  ): HTMLElement {
-    const tile = document.createElement("img") as HTMLImageElement;
-    tile.setAttribute("role", "presentation");
-
-    const url = this.getTileUrl(coords);
-
-    fetch(url)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("fetch failed");
-        }
-        return response.blob();
-      })
-      .then((blob) => {
-        tile.src = URL.createObjectURL(blob);
-        done(null, tile);
-      })
-      .catch(() => {
-        // If fetch also fails (connect-src blocked), show empty tile
-        tile.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
-        done(null, tile);
-      });
-
-    return tile;
-  },
-});
-
-// ─── Component: Add blob tile layer to map ───
-function BlobTiles() {
-  const map = useMap();
-  const layerRef = useRef<L.TileLayer | null>(null);
-
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const layer = new (BlobTileLayer as any)(
-      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-      {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        maxZoom: 19,
-        subdomains: "abcd",
-      }
-    ) as L.TileLayer;
-
-    layerRef.current = layer;
-    layer.addTo(map);
-
-    return () => {
-      if (layerRef.current) {
-        map.removeLayer(layerRef.current);
-      }
-    };
-  }, [map]);
-
-  return null;
-}
 
 // ─── FitBounds component ───
 function FitBounds({ incidents, locations }: { incidents: IncidentData[]; locations: LocationData[] }) {
@@ -175,7 +111,14 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
         zoomControl={true}
         scrollWheelZoom={true}
       >
-        <BlobTiles />
+        {/* Standard TileLayer — requires imgSrc CSP to include https://*.basemaps.cartocdn.com */}
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+          maxZoom={19}
+          subdomains="abcd"
+        />
+
         {center == null && <FitBounds incidents={incidents} locations={locations} />}
 
         {/* Location markers */}
