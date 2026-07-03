@@ -174,7 +174,7 @@ export default function ActiveIncidents() {
                     incidents={[selected]}
                     locations={[]}
                     height={180}
-                    center={[selected.latitude, selected.longitude]}
+                    center={{ lat: selected.latitude, lng: selected.longitude }}
                     zoom={14}
                   />
                 </Suspense>

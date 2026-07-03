@@ -1,9 +1,7 @@
 {
   "name": "crisis-logistics-command-app",
   "private": true,
-
-  
-  "version": "0.8.0",
+  "version": "0.9.0",
   "type": "module",
   "scripts": {
     "build": "tsc && vite build",
@@ -26,6 +24,7 @@
     "@osdk/react": "^0.13.0",
     "@react-leaflet/core": "^3.0.0",
     "@types/leaflet": "^1.9.21",
+    "@vis.gl/react-google-maps": "^1.9.0",
     "leaflet": "^1.9.4",
     "normalize.css": "^8.0.1",
     "react": "^19.2.7",

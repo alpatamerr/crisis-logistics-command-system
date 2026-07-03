@@ -1,7 +1,12 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { MapContainer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
-import L from "leaflet";
-import { Tag } from "@blueprintjs/core";
+import { useMemo, useEffect, useRef, useCallback, useState } from "react";
+import {
+  APIProvider,
+  Map,
+  useMap,
+  AdvancedMarker,
+  InfoWindow,
+  useAdvancedMarkerRef,
+} from "@vis.gl/react-google-maps";
 
 // ─── Types ───
 interface IncidentData {
@@ -25,13 +30,14 @@ interface CrisisMapProps {
   incidents: IncidentData[];
   locations: LocationData[];
   height?: number;
-  center?: [number, number];
+  center?: { lat: number; lng: number };
   zoom?: number;
 }
 
 // ─── Constants ───
-const LONDON_CENTER: [number, number] = [51.5, -0.12];
+const LONDON_CENTER = { lat: 51.5, lng: -0.12 };
 const DEFAULT_ZOOM = 12;
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
 
 const SEVERITY_COLORS: Record<string, string> = {
   Severe: "#DB3737",
@@ -47,107 +53,7 @@ const SEVERITY_ORDER: Record<string, number> = {
   Minimal: 3,
 };
 
-// ─── Tile providers (ordered by preference) ───
-const TILE_URLS = [
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-];
-
-// ─── Custom fetch-based TileLayer that bypasses CSP img-src ───
-// This fetches tiles via fetch() (connect-src) and converts to blob URLs (img-src: blob:)
-function createFetchTileLayer(urlTemplate: string): L.TileLayer {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const FetchTileLayer = (L.TileLayer as any).extend({
-    createTile: function (
-      this: { getTileUrl(c: L.Coords): string },
-      coords: L.Coords,
-      done: (err: Error | null, tile: HTMLElement) => void
-    ) {
-      const tile = document.createElement("img");
-      tile.setAttribute("role", "presentation");
-      tile.crossOrigin = "anonymous";
-
-      const url = this.getTileUrl(coords);
-
-      fetch(url, { mode: "cors" })
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error(`Tile fetch failed: ${res.status}`);
-          }
-          return res.blob();
-        })
-        .then((blob) => {
-          tile.src = URL.createObjectURL(blob);
-          done(null, tile);
-        })
-        .catch(() => {
-          // Fallback: try loading directly (in case fetch fails but img-src allows it)
-          tile.src = url;
-          tile.onload = () => done(null, tile);
-          tile.onerror = () => done(new Error("Tile load failed"), tile);
-        });
-
-      return tile;
-    },
-  });
-
-  return new FetchTileLayer(urlTemplate, {
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19,
-    subdomains: "abc",
-  });
-}
-
-// ─── Component: Adds tile layer with fallback ───
-function TileLayerWithFallback() {
-  const map = useMap();
-  const layerRef = useRef<L.TileLayer | null>(null);
-  const providerIndexRef = useRef(0);
-  const [, setRetry] = useState(0);
-
-  const addTileLayer = useCallback(
-    (index: number) => {
-      if (index >= TILE_URLS.length) {
-        return;
-      }
-
-      // Remove previous layer
-      if (layerRef.current) {
-        map.removeLayer(layerRef.current);
-      }
-
-      const layer = createFetchTileLayer(TILE_URLS[index]);
-      layerRef.current = layer;
-      layer.addTo(map);
-
-      // Listen for tile errors to try next provider
-      let errorCount = 0;
-      layer.on("tileerror", () => {
-        errorCount++;
-        if (errorCount > 3 && index < TILE_URLS.length - 1) {
-          providerIndexRef.current = index + 1;
-          setRetry((r) => r + 1);
-        }
-      });
-    },
-    [map]
-  );
-
-  useEffect(() => {
-    addTileLayer(providerIndexRef.current);
-    return () => {
-      if (layerRef.current) {
-        map.removeLayer(layerRef.current);
-      }
-    };
-  }, [addTileLayer, map]);
-
-  return null;
-}
-
-// ─── Component: FitBounds ───
+// ─── FitBounds component ───
 function FitBounds({
   incidents,
   locations,
@@ -159,28 +65,121 @@ function FitBounds({
   const hasFitted = useRef(false);
 
   useEffect(() => {
-    if (hasFitted.current) {
+    if (!map || hasFitted.current) {
       return;
     }
-    const points: [number, number][] = [];
+
+    const bounds = new google.maps.LatLngBounds();
+    let hasPoints = false;
+
     incidents.forEach((inc) => {
       if (inc.latitude != null && inc.longitude != null) {
-        points.push([inc.latitude, inc.longitude]);
+        bounds.extend({ lat: inc.latitude, lng: inc.longitude });
+        hasPoints = true;
       }
     });
     locations.forEach((loc) => {
       if (loc.latitude != null && loc.longitude != null) {
-        points.push([loc.latitude, loc.longitude]);
+        bounds.extend({ lat: loc.latitude, lng: loc.longitude });
+        hasPoints = true;
       }
     });
-    if (points.length > 1) {
-      const bounds = L.latLngBounds(points);
-      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+
+    if (hasPoints) {
+      map.fitBounds(bounds, { top: 30, right: 30, bottom: 30, left: 30 });
       hasFitted.current = true;
     }
-  }, [incidents, locations, map]);
+  }, [map, incidents, locations]);
 
   return null;
+}
+
+// ─── Location dot marker ───
+function LocationDot({ loc }: { loc: LocationData }) {
+  if (loc.latitude == null || loc.longitude == null) {
+    return null;
+  }
+  return (
+    <AdvancedMarker
+      position={{ lat: loc.latitude, lng: loc.longitude }}
+      title={loc.locationName ?? loc.locationId ?? ""}
+    >
+      <div
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          background: "#8A9BA8",
+          opacity: 0.45,
+          border: "1px solid #5C7080",
+        }}
+      />
+    </AdvancedMarker>
+  );
+}
+
+// ─── Incident marker with InfoWindow ───
+function IncidentMarker({ inc }: { inc: IncidentData }) {
+  const [open, setOpen] = useState(false);
+  const [markerRef, marker] = useAdvancedMarkerRef();
+
+  const color = SEVERITY_COLORS[inc.severityLevel ?? ""] ?? "#5C7080";
+
+  const handleClick = useCallback(() => {
+    setOpen((prev) => !prev);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setOpen(false);
+  }, []);
+
+  if (inc.latitude == null || inc.longitude == null) {
+    return null;
+  }
+
+  return (
+    <>
+      <AdvancedMarker
+        ref={markerRef}
+        position={{ lat: inc.latitude, lng: inc.longitude }}
+        title={`${inc.severityLevel} — ${inc.incidentType}`}
+        onClick={handleClick}
+      >
+        <div
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            background: color,
+            border: "2.5px solid #fff",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.35)",
+            cursor: "pointer",
+          }}
+        />
+      </AdvancedMarker>
+
+      {open && marker && (
+        <InfoWindow anchor={marker} onCloseClick={handleClose}>
+          <div style={{ minWidth: 220, padding: 4 }}>
+            <strong style={{ color, fontSize: 13 }}>
+              {inc.severityLevel}
+            </strong>{" "}
+            — {inc.incidentType}
+            <hr
+              style={{
+                margin: "6px 0",
+                border: "none",
+                borderTop: "1px solid #e1e8ed",
+              }}
+            />
+            <span style={{ fontSize: 12, color: "#394B59" }}>
+              {inc.description ?? "—"}
+            </span>
+          </div>
+        </InfoWindow>
+      )}
+    </>
+  );
 }
 
 // ─── Main Component ───
@@ -201,115 +200,83 @@ export default function CrisisMap({
     [incidents]
   );
 
+  const mapCenter = center ?? LONDON_CENTER;
+  const mapZoom = zoom ?? DEFAULT_ZOOM;
+
+  if (!API_KEY) {
+    return (
+      <div
+        style={{
+          height: height ?? 520,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#e8ecf0",
+          borderRadius: 8,
+          border: "1px solid #d3d8de",
+          color: "#5C7080",
+          fontSize: 14,
+        }}
+      >
+        Google Maps API key not configured (VITE_GOOGLE_MAPS_API_KEY)
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
-        height: height != null ? height : "100%",
+        height: height ?? "100%",
         minHeight: height ?? 520,
         width: "100%",
         borderRadius: 8,
         overflow: "hidden",
         border: "1px solid #d3d8de",
         boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-        background: "#dde6e9",
         position: "relative",
       }}
     >
-      <MapContainer
-        center={center ?? LONDON_CENTER}
-        zoom={zoom ?? DEFAULT_ZOOM}
-        style={{ height: "100%", width: "100%", background: "#dde6e9" }}
-        zoomControl={true}
-        scrollWheelZoom={true}
-      >
-        <TileLayerWithFallback />
-        {center == null && (
-          <FitBounds incidents={incidents} locations={locations} />
-        )}
+      <APIProvider apiKey={API_KEY}>
+        <Map
+          defaultCenter={mapCenter}
+          defaultZoom={mapZoom}
+          gestureHandling="greedy"
+          disableDefaultUI={false}
+          mapId="crisis-map"
+          style={{ width: "100%", height: "100%" }}
+        >
+          {center == null && (
+            <FitBounds incidents={incidents} locations={locations} />
+          )}
 
-        {/* Location markers (grey, subtle) */}
-        {locations.map((loc) => {
-          if (loc.latitude == null || loc.longitude == null) {
-            return null;
-          }
-          return (
-            <CircleMarker
-              key={loc.locationId}
-              center={[loc.latitude, loc.longitude]}
-              radius={5}
-              pathOptions={{
-                color: "#5C7080",
-                fillColor: "#8A9BA8",
-                fillOpacity: 0.4,
-                weight: 1,
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -5]}>
-                <strong>{loc.locationName ?? loc.locationId}</strong>
-                <br />
-                {loc.category ?? ""}
-              </Tooltip>
-            </CircleMarker>
-          );
-        })}
+          {/* Location markers (grey dots) */}
+          {locations.map((loc) => (
+            <LocationDot key={loc.locationId} loc={loc} />
+          ))}
 
-        {/* Incident markers (severity-colored, prominent) */}
-        {sortedIncidents.map((inc) => {
-          if (inc.latitude == null || inc.longitude == null) {
-            return null;
-          }
-          const color =
-            SEVERITY_COLORS[inc.severityLevel ?? ""] ?? "#5C7080";
-          return (
-            <CircleMarker
-              key={inc.incidentId}
-              center={[inc.latitude, inc.longitude]}
-              radius={10}
-              pathOptions={{
-                color: "#fff",
-                fillColor: color,
-                fillOpacity: 0.9,
-                weight: 2.5,
-              }}
-            >
-              <Popup>
-                <div style={{ minWidth: 220 }}>
-                  <strong style={{ color, fontSize: 13 }}>
-                    {inc.severityLevel}
-                  </strong>{" "}
-                  — {inc.incidentType}
-                  <hr
-                    style={{
-                      margin: "6px 0",
-                      border: "none",
-                      borderTop: "1px solid #e1e8ed",
-                    }}
-                  />
-                  <span style={{ fontSize: 12, color: "#394B59" }}>
-                    {inc.description ?? "—"}
-                  </span>
-                </div>
-              </Popup>
-            </CircleMarker>
-          );
-        })}
-      </MapContainer>
+          {/* Incident markers (severity-colored) */}
+          {sortedIncidents.map((inc) => (
+            <IncidentMarker key={inc.incidentId} inc={inc} />
+          ))}
+        </Map>
+      </APIProvider>
 
       {/* Severity Legend */}
       <div
         style={{
           position: "absolute",
-          bottom: 24,
-          right: 12,
+          bottom: 28,
+          right: 60,
           background: "rgba(255,255,255,0.95)",
           borderRadius: 6,
-          padding: "8px 12px",
+          padding: "8px 14px",
           boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-          zIndex: 1000,
+          zIndex: 1,
           display: "flex",
-          gap: 10,
+          gap: 12,
           alignItems: "center",
           fontSize: 11,
+          fontWeight: 500,
         }}
       >
         {Object.entries(SEVERITY_COLORS).map(([label, clr]) => (
@@ -328,9 +295,7 @@ export default function CrisisMap({
                 display: "inline-block",
               }}
             />
-            <Tag minimal style={{ fontSize: 10 }}>
-              {label}
-            </Tag>
+            {label}
           </span>
         ))}
       </div>
