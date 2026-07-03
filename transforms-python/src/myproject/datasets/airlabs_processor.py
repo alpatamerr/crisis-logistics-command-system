@@ -73,7 +73,7 @@ def _parse_flights(flights, current_time):
     return rows
 
 
-@incremental(semantic_version=1)
+@incremental(semantic_version=2)
 @lightweight
 @external_systems(source=Source(SOURCE_RID))
 @transform(
