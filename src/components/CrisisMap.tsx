@@ -1,11 +1,6 @@
-import { useMemo, useEffect, useRef, useCallback, useState } from "react";
-import {
-  APIProvider,
-  Map,
-  useMap,
-  Marker,
-  InfoWindow,
-} from "@vis.gl/react-google-maps";
+import { useMemo, useEffect, useRef } from "react";
+import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
+import L from "leaflet";
 
 // ─── Types ───
 interface IncidentData {
@@ -34,9 +29,8 @@ interface CrisisMapProps {
 }
 
 // ─── Constants ───
-const LONDON_CENTER = { lat: 51.5, lng: -0.12 };
+const LONDON_CENTER: [number, number] = [51.5, -0.12];
 const DEFAULT_ZOOM = 12;
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
 
 const SEVERITY_COLORS: Record<string, string> = {
   Severe: "#DB3737",
@@ -52,123 +46,42 @@ const SEVERITY_ORDER: Record<string, number> = {
   Minimal: 3,
 };
 
-// ─── SVG marker icon creator ───
-function createSvgMarkerUrl(color: string, size: number): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-    <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="${color}" stroke="white" stroke-width="2.5"/>
-  </svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
-const LOCATION_ICON_URL = createSvgMarkerUrl("#8A9BA8", 12);
+// CartoDB Voyager - colorful map tiles (proven to work via img-src CSP)
+const TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
 // ─── FitBounds component ───
-function FitBounds({
-  incidents,
-  locations,
-}: {
-  incidents: IncidentData[];
-  locations: LocationData[];
-}) {
+function FitBounds({ incidents, locations }: { incidents: IncidentData[]; locations: LocationData[] }) {
   const map = useMap();
   const hasFitted = useRef(false);
 
   useEffect(() => {
-    if (!map || hasFitted.current) {
+    if (hasFitted.current) {
       return;
     }
-
-    const bounds = new google.maps.LatLngBounds();
-    let hasPoints = false;
-
+    const points: [number, number][] = [];
     incidents.forEach((inc) => {
       if (inc.latitude != null && inc.longitude != null) {
-        bounds.extend({ lat: inc.latitude, lng: inc.longitude });
-        hasPoints = true;
+        points.push([inc.latitude, inc.longitude]);
       }
     });
     locations.forEach((loc) => {
       if (loc.latitude != null && loc.longitude != null) {
-        bounds.extend({ lat: loc.latitude, lng: loc.longitude });
-        hasPoints = true;
+        points.push([loc.latitude, loc.longitude]);
       }
     });
-
-    if (hasPoints) {
-      map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+    if (points.length > 1) {
+      const bounds = L.latLngBounds(points);
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
       hasFitted.current = true;
     }
-  }, [map, incidents, locations]);
+  }, [incidents, locations, map]);
 
   return null;
 }
 
-// ─── Incident marker with InfoWindow ───
-function IncidentMarker({ inc }: { inc: IncidentData }) {
-  const [open, setOpen] = useState(false);
-
-  const color = SEVERITY_COLORS[inc.severityLevel ?? ""] ?? "#5C7080";
-  const iconUrl = useMemo(() => createSvgMarkerUrl(color, 22), [color]);
-
-  const handleClick = useCallback(() => {
-    setOpen((prev) => !prev);
-  }, []);
-
-  const handleClose = useCallback(() => {
-    setOpen(false);
-  }, []);
-
-  if (inc.latitude == null || inc.longitude == null) {
-    return null;
-  }
-
-  const position = { lat: inc.latitude, lng: inc.longitude };
-
-  return (
-    <>
-      <Marker
-        position={position}
-        title={`${inc.severityLevel} — ${inc.incidentType}`}
-        onClick={handleClick}
-        icon={{
-          url: iconUrl,
-          scaledSize: new google.maps.Size(22, 22),
-          anchor: new google.maps.Point(11, 11),
-        }}
-      />
-
-      {open && (
-        <InfoWindow position={position} onCloseClick={handleClose}>
-          <div style={{ minWidth: 220, padding: 4 }}>
-            <strong style={{ color, fontSize: 13 }}>
-              {inc.severityLevel}
-            </strong>{" "}
-            — {inc.incidentType}
-            <hr
-              style={{
-                margin: "6px 0",
-                border: "none",
-                borderTop: "1px solid #e1e8ed",
-              }}
-            />
-            <span style={{ fontSize: 12, color: "#394B59" }}>
-              {inc.description ?? "—"}
-            </span>
-          </div>
-        </InfoWindow>
-      )}
-    </>
-  );
-}
-
 // ─── Main Component ───
-export default function CrisisMap({
-  incidents,
-  locations,
-  height,
-  center,
-  zoom,
-}: CrisisMapProps) {
+export default function CrisisMap({ incidents, locations, height, center, zoom }: CrisisMapProps) {
   const sortedIncidents = useMemo(
     () =>
       [...incidents].sort(
@@ -179,28 +92,10 @@ export default function CrisisMap({
     [incidents]
   );
 
-  const mapCenter = center ?? LONDON_CENTER;
+  const mapCenter: [number, number] = center
+    ? [center.lat, center.lng]
+    : LONDON_CENTER;
   const mapZoom = zoom ?? DEFAULT_ZOOM;
-
-  if (!API_KEY) {
-    return (
-      <div
-        style={{
-          height: height ?? 520,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#e8ecf0",
-          borderRadius: 8,
-          border: "1px solid #d3d8de",
-          color: "#5C7080",
-          fontSize: 14,
-        }}
-      >
-        Google Maps API key not configured
-      </div>
-    );
-  }
 
   return (
     <div
@@ -215,56 +110,74 @@ export default function CrisisMap({
         position: "relative",
       }}
     >
-      <APIProvider apiKey={API_KEY}>
-        <Map
-          defaultCenter={mapCenter}
-          defaultZoom={mapZoom}
-          gestureHandling="greedy"
-          disableDefaultUI={false}
-          style={{ width: "100%", height: "100%" }}
-        >
-          {center == null && (
-            <FitBounds incidents={incidents} locations={locations} />
-          )}
+      <MapContainer
+        center={mapCenter}
+        zoom={mapZoom}
+        style={{ height: "100%", width: "100%" }}
+        zoomControl={true}
+        scrollWheelZoom={true}
+      >
+        <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} maxZoom={19} />
 
-          {/* Location markers (small grey dots) */}
-          {locations.map((loc) => {
-            if (loc.latitude == null || loc.longitude == null) {
-              return null;
-            }
-            return (
-              <Marker
-                key={loc.locationId}
-                position={{ lat: loc.latitude, lng: loc.longitude }}
-                title={loc.locationName ?? loc.locationId ?? ""}
-                icon={{
-                  url: LOCATION_ICON_URL,
-                  scaledSize: new google.maps.Size(12, 12),
-                  anchor: new google.maps.Point(6, 6),
-                }}
-                opacity={0.5}
-              />
-            );
-          })}
+        {center == null && <FitBounds incidents={incidents} locations={locations} />}
 
-          {/* Incident markers (severity-colored circles) */}
-          {sortedIncidents.map((inc) => (
-            <IncidentMarker key={inc.incidentId} inc={inc} />
-          ))}
-        </Map>
-      </APIProvider>
+        {/* Location markers (grey, subtle) */}
+        {locations.map((loc) => {
+          if (loc.latitude == null || loc.longitude == null) {
+            return null;
+          }
+          return (
+            <CircleMarker
+              key={loc.locationId}
+              center={[loc.latitude, loc.longitude]}
+              radius={5}
+              pathOptions={{ color: "#5C7080", fillColor: "#8A9BA8", fillOpacity: 0.4, weight: 1 }}
+            >
+              <Tooltip direction="top" offset={[0, -5]}>
+                <strong>{loc.locationName ?? loc.locationId}</strong><br />
+                {loc.category ?? ""}
+              </Tooltip>
+            </CircleMarker>
+          );
+        })}
+
+        {/* Incident markers (severity-colored, prominent) */}
+        {sortedIncidents.map((inc) => {
+          if (inc.latitude == null || inc.longitude == null) {
+            return null;
+          }
+          const color = SEVERITY_COLORS[inc.severityLevel ?? ""] ?? "#5C7080";
+          return (
+            <CircleMarker
+              key={inc.incidentId}
+              center={[inc.latitude, inc.longitude]}
+              radius={10}
+              pathOptions={{ color: "#fff", fillColor: color, fillOpacity: 0.9, weight: 2.5 }}
+            >
+              <Popup>
+                <div style={{ minWidth: 220 }}>
+                  <strong style={{ color, fontSize: 13 }}>{inc.severityLevel}</strong>{" "}
+                  — {inc.incidentType}
+                  <hr style={{ margin: "6px 0", border: "none", borderTop: "1px solid #e1e8ed" }} />
+                  <span style={{ fontSize: 12, color: "#394B59" }}>{inc.description ?? "—"}</span>
+                </div>
+              </Popup>
+            </CircleMarker>
+          );
+        })}
+      </MapContainer>
 
       {/* Severity Legend */}
       <div
         style={{
           position: "absolute",
           bottom: 28,
-          right: 60,
+          right: 12,
           background: "rgba(255,255,255,0.95)",
           borderRadius: 6,
           padding: "8px 14px",
           boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
-          zIndex: 1,
+          zIndex: 1000,
           display: "flex",
           gap: 12,
           alignItems: "center",
@@ -273,10 +186,7 @@ export default function CrisisMap({
         }}
       >
         {Object.entries(SEVERITY_COLORS).map(([label, clr]) => (
-          <span
-            key={label}
-            style={{ display: "flex", alignItems: "center", gap: 4 }}
-          >
+          <span key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span
               style={{
                 width: 10,
