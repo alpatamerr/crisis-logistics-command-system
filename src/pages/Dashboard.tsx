@@ -163,9 +163,9 @@ export default function Dashboard() {
         />
 
         {/* Center: Map */}
-        <div style={{ minHeight: 480 }}>
+        <div style={{ minHeight: 520, height: "100%" }}>
           <MapErrorBoundary>
-            <Suspense fallback={<div style={{ height: 480, display: "flex", alignItems: "center", justifyContent: "center" }}><Spinner /></div>}>
+            <Suspense fallback={<div style={{ height: 520, display: "flex", alignItems: "center", justifyContent: "center" }}><Spinner /></div>}>
               <CrisisMap incidents={filteredIncidents} locations={filteredLocations} />
             </Suspense>
           </MapErrorBoundary>
