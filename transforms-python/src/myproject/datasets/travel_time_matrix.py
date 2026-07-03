@@ -213,5 +213,10 @@ def compute(ctx, hubs, incidents, output, source):
     # Deduplicate (prefer new results over stale cache)
     combined = combined.unique(subset=["hub_id", "incident_id"], keep="last")
 
+    # Add primary key column for object type backing
+    combined = combined.with_columns(
+        (pl.col("hub_id") + "___" + pl.col("incident_id")).alias("pair_id")
+    )
+
     output.write_table(combined)
     logger.info(f"Written {combined.height} total travel time entries")
