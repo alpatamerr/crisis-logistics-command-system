@@ -52,7 +52,9 @@ function MapUpdater({ center, zoom }: { center?: [number, number]; zoom?: number
   const prevCenter = useRef<[number, number] | undefined>(undefined);
 
   useEffect(() => {
-    if (!center) return;
+    if (!center) {
+      return;
+    }
     // Only fly if center actually changed
     if (
       prevCenter.current &&
