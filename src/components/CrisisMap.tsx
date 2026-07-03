@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 
@@ -100,8 +100,42 @@ function FitBounds({ incidents, locations }: { incidents: IncidentData[]; locati
   return null;
 }
 
+// ─── ResetHandler: fit bounds when triggered ───
+function ResetHandler({ trigger, incidents, locations }: { trigger: number; incidents: IncidentData[]; locations: LocationData[] }) {
+  const map = useMap();
+  const prevTrigger = useRef(0);
+
+  useEffect(() => {
+    if (trigger === 0 || trigger === prevTrigger.current) {
+      return;
+    }
+    prevTrigger.current = trigger;
+    const points: [number, number][] = [];
+    incidents.forEach((inc) => {
+      if (inc.latitude != null && inc.longitude != null) {
+        points.push([inc.latitude, inc.longitude]);
+      }
+    });
+    locations.forEach((loc) => {
+      if (loc.latitude != null && loc.longitude != null) {
+        points.push([loc.latitude, loc.longitude]);
+      }
+    });
+    if (points.length > 1) {
+      const bounds = L.latLngBounds(points);
+      map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 14, duration: 0.6 });
+    } else {
+      map.flyTo(LONDON_CENTER, DEFAULT_ZOOM, { duration: 0.6 });
+    }
+  }, [trigger, incidents, locations, map]);
+
+  return null;
+}
+
 // ─── Main Component ───
 export default function CrisisMap({ incidents, locations, height, center, zoom }: CrisisMapProps) {
+  const [resetTrigger, setResetTrigger] = useState(0);
+
   const sortedIncidents = useMemo(
     () =>
       [...incidents].sort(
@@ -145,6 +179,7 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
 
         {center != null && <MapUpdater center={mapCenter} zoom={mapZoom} />}
         {center == null && <FitBounds incidents={incidents} locations={locations} />}
+        {center == null && <ResetHandler trigger={resetTrigger} incidents={incidents} locations={locations} />}
 
         {/* Location markers */}
         {locations.map((loc) => {
@@ -191,6 +226,34 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
           );
         })}
       </MapContainer>
+
+      {/* Reset View Button — only on the main map (not mini-map) */}
+      {center == null && (
+        <button
+          onClick={() => setResetTrigger(prev => prev + 1)}
+          title="Reset to default view"
+          style={{
+            position: "absolute",
+            top: 80,
+            left: 10,
+            zIndex: 1000,
+            background: "#fff",
+            border: "2px solid rgba(0,0,0,0.2)",
+            borderRadius: 4,
+            width: 30,
+            height: 30,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            fontSize: 16,
+            color: "#333",
+            boxShadow: "0 1px 5px rgba(0,0,0,0.15)",
+          }}
+        >
+          ⌂
+        </button>
+      )}
 
       {/* Legend */}
       <div
