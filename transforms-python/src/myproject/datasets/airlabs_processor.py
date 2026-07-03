@@ -7,15 +7,49 @@ SOURCE_RID = "ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"
 API_PATH = "/api/v9/flights"
 BBOX = "51.41,-0.50,51.56,-0.15"  # West London bounding box
 
+# Known helicopter ICAO type designators for cross-reference detection
+HELICOPTER_ICAO_CODES = {
+    # Airbus Helicopters
+    "EC20", "EC25", "EC30", "EC35", "EC45", "EC55", "EC75",
+    "H125", "H130", "H135", "H145", "H155", "H160", "H175", "H215", "H225",
+    "AS32", "AS33", "AS35", "AS50", "AS55", "AS65", "SA34", "SA36",
+    # Leonardo/AgustaWestland
+    "A109", "A119", "A139", "A149", "A169", "A189", "EH10", "NH90",
+    # Bell
+    "B06", "B105", "B206", "B212", "B214", "B222", "B230", "B407", "B412",
+    "B429", "B430", "B505", "BK17",
+    # Robinson
+    "R22", "R44", "R66",
+    # Sikorsky
+    "S61", "S64", "S70", "S76", "S92", "S300", "S330", "S333",
+    # MD Helicopters
+    "MD52", "MD60", "MD90", "EXPL",
+    # Mil/Kamov
+    "MI8", "MI17", "MI24", "MI26", "KA32", "KA62",
+    # Other
+    "W3", "LYNX", "GUZL", "S269", "CABR", "HUCO",
+}
+
+
+def _classify_aircraft(aircraft_icao):
+    """Classify aircraft as HELICOPTER or AIRCRAFT based on ICAO type code."""
+    if not aircraft_icao:
+        return "AIRCRAFT"
+    code = aircraft_icao.upper().strip()
+    if code in HELICOPTER_ICAO_CODES:
+        return "HELICOPTER"
+    return "AIRCRAFT"
+
 
 def _parse_flights(flights, current_time):
-    """Parse Airlabs flight data into rows."""
+    """Parse Airlabs flight data into rows with helicopter detection."""
     rows = []
     for flight in flights:
         hex_id = flight.get("hex")
         lat = flight.get("lat")
         lng = flight.get("lng")
         alt = flight.get("alt")
+        aircraft_icao = flight.get("aircraft_icao")
         status_raw = flight.get("status", "unknown")
 
         if status_raw == "landed":
@@ -25,9 +59,11 @@ def _parse_flights(flights, current_time):
         else:
             status = "UNKNOWN"
 
+        vehicle_type = _classify_aircraft(aircraft_icao)
+
         rows.append({
             "unit_id": str(hex_id) if hex_id else None,
-            "vehicle_type": "AIRCRAFT",
+            "vehicle_type": vehicle_type,
             "latitude": float(lat) if lat is not None else None,
             "longitude": float(lng) if lng is not None else None,
             "status": status,
