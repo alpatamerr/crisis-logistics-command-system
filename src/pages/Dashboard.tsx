@@ -224,7 +224,7 @@ export default function Dashboard() {
       )}
 
       {/* ─── Filter Bar: Severity chips + Time range ─── */}
-      <Card style={{ marginBottom: 12, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
+      <Card style={{ marginBottom: 12, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap", position: "relative" }}>
         {/* Severity filter chips */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: "#5c7080", marginRight: 4 }}>Severity:</span>
@@ -264,24 +264,22 @@ export default function Dashboard() {
           </ButtonGroup>
         </div>
 
-        {/* Active filter count + Clear all */}
+        {/* Active filter count + Clear all — absolutely positioned so center doesn't shift */}
         {activeFilterCount > 0 && (
-          <>
-            <div style={{ flex: 1 }} />
-            <Button
-              small
-              minimal
-              intent={Intent.WARNING}
-              icon="filter-remove"
-              text={`Clear all (${activeFilterCount})`}
-              onClick={() => {
-                setTypeFilters(new Set());
-                setCategoryFilters(new Set());
-                setSeverityFilters(new Set());
-                setTimeRange("all");
-              }}
-            />
-          </>
+          <Button
+            small
+            minimal
+            intent={Intent.WARNING}
+            icon="filter-remove"
+            text={`Clear all (${activeFilterCount})`}
+            style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)" }}
+            onClick={() => {
+              setTypeFilters(new Set());
+              setCategoryFilters(new Set());
+              setSeverityFilters(new Set());
+              setTimeRange("all");
+            }}
+          />
         )}
       </Card>
 
