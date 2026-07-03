@@ -14,10 +14,20 @@ const SEVERITY_INTENT: Record<string, Intent> = {
 
 const PAGE_SIZE = 25;
 
+const SEVERITY_ORDER: Record<string, number> = {
+  Severe: 1,
+  Serious: 2,
+  Moderate: 3,
+  Minimal: 4,
+};
+
+type SortDir = "asc" | "desc";
+
 export default function ActiveIncidents() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [severitySort, setSeveritySort] = useState<SortDir>("asc");
 
   const incidents = useOsdkObjects(LiveIncident, {
     orderBy: { severityLevel: "asc" },
@@ -25,7 +35,7 @@ export default function ActiveIncidents() {
   });
 
   const filtered = useMemo(() => {
-    return (incidents.data ?? []).filter((inc) => {
+    let data = (incidents.data ?? []).filter((inc) => {
       if (!search) {
         return true;
       }
@@ -35,7 +45,14 @@ export default function ActiveIncidents() {
       const sev = String(inc.severityLevel ?? "").toLowerCase();
       return desc.includes(term) || type.includes(term) || sev.includes(term);
     });
-  }, [incidents.data, search]);
+    // Sort by severity
+    data = [...data].sort((a, b) => {
+      const aOrder = SEVERITY_ORDER[a.severityLevel ?? ""] ?? 5;
+      const bOrder = SEVERITY_ORDER[b.severityLevel ?? ""] ?? 5;
+      return severitySort === "asc" ? aOrder - bOrder : bOrder - aOrder;
+    });
+    return data;
+  }, [incidents.data, search, severitySort]);
 
   const visible = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
@@ -75,7 +92,12 @@ export default function ActiveIncidents() {
           <HTMLTable bordered striped interactive style={{ width: "100%" }}>
             <thead>
               <tr>
-                <th>Severity</th>
+                <th
+                  style={{ cursor: "pointer", userSelect: "none" }}
+                  onClick={() => setSeveritySort(prev => prev === "asc" ? "desc" : "asc")}
+                >
+                  Severity <Icon icon={severitySort === "asc" ? "sort-asc" : "sort-desc"} size={12} />
+                </th>
                 <th>Type</th>
                 <th>Description</th>
                 <th>Updated</th>

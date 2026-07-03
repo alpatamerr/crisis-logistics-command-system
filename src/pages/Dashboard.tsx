@@ -26,24 +26,32 @@ class MapErrorBoundary extends Component<{ children: ReactNode }, { hasError: bo
   }
 }
 
-function HistogramPanel({ title, items, activeFilter, onFilter }: {
+function HistogramPanel({ title, items, activeFilters, onToggle, onClear }: {
   title: string;
   items: { label: string; count: number; color?: string }[];
-  activeFilter: string | null;
-  onFilter: (label: string | null) => void;
+  activeFilters: Set<string>;
+  onToggle: (label: string) => void;
+  onClear: () => void;
 }) {
   const maxCount = Math.max(...items.map(i => i.count), 1);
   return (
     <div className="filter-panel">
-      <h5>{title}</h5>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h5 style={{ margin: 0 }}>{title}</h5>
+        {activeFilters.size > 0 && (
+          <Tag minimal interactive intent={Intent.PRIMARY} onClick={onClear} style={{ fontSize: 10 }}>
+            Clear ({activeFilters.size})
+          </Tag>
+        )}
+      </div>
       {items.map((item) => (
         <div
           key={item.label}
           role="button"
           tabIndex={0}
-          className={`histogram-item ${activeFilter === item.label ? "active" : ""}`}
-          onClick={() => onFilter(activeFilter === item.label ? null : item.label)}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { onFilter(activeFilter === item.label ? null : item.label); } }}
+          className={`histogram-item ${activeFilters.has(item.label) ? "active" : ""}`}
+          onClick={() => onToggle(item.label)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { onToggle(item.label); } }}
         >
           <span className="histogram-label">{item.label}</span>
           <div className="histogram-bar-container">
@@ -51,7 +59,7 @@ function HistogramPanel({ title, items, activeFilter, onFilter }: {
               className="histogram-bar"
               style={{
                 width: `${(item.count / maxCount) * 100}%`,
-                background: item.color ?? "#2d72d2",
+                background: activeFilters.size === 0 || activeFilters.has(item.label) ? (item.color ?? "#2d72d2") : "#d8e1e8",
               }}
             />
           </div>
@@ -83,8 +91,23 @@ function MetricCard({ title, value, intent, icon, loading }: {
 }
 
 export default function Dashboard() {
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [typeFilters, setTypeFilters] = useState<Set<string>>(new Set());
+  const [categoryFilters, setCategoryFilters] = useState<Set<string>>(new Set());
+
+  const toggleTypeFilter = (label: string) => {
+    setTypeFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) { next.delete(label); } else { next.add(label); }
+      return next;
+    });
+  };
+  const toggleCategoryFilter = (label: string) => {
+    setCategoryFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) { next.delete(label); } else { next.add(label); }
+      return next;
+    });
+  };
 
   const incidents = useOsdkObjects(LiveIncident, { pageSize: 200 });
   const locations = useOsdkObjects(LiveLocation, { pageSize: 200 });
@@ -116,23 +139,23 @@ export default function Dashboard() {
       .map(([label, count]) => ({ label, count, color: "#5c7080" }));
   }, [locations.data]);
 
-  // Filter incidents by type for the map
+  // Filter incidents by selected types for the map
   const filteredIncidents = useMemo(() => {
-    let data = incidents.data ?? [];
-    if (typeFilter) {
-      data = data.filter(inc => inc.incidentType === typeFilter);
+    const data = incidents.data ?? [];
+    if (typeFilters.size === 0) {
+      return data;
     }
-    return data;
-  }, [incidents.data, typeFilter]);
+    return data.filter(inc => typeFilters.has(inc.incidentType ?? "Unknown"));
+  }, [incidents.data, typeFilters]);
 
-  // Filter locations by category for the map
+  // Filter locations by selected categories for the map
   const filteredLocations = useMemo(() => {
-    let data = locations.data ?? [];
-    if (categoryFilter) {
-      data = data.filter(loc => loc.category === categoryFilter);
+    const data = locations.data ?? [];
+    if (categoryFilters.size === 0) {
+      return data;
     }
-    return data;
-  }, [locations.data, categoryFilter]);
+    return data.filter(loc => categoryFilters.has(loc.category ?? "Unknown"));
+  }, [locations.data, categoryFilters]);
 
   // Metrics
   const incidentCount = incidents.data?.length ?? 0;
@@ -158,8 +181,9 @@ export default function Dashboard() {
         <HistogramPanel
           title="Incident Type"
           items={typeHistogram}
-          activeFilter={typeFilter}
-          onFilter={setTypeFilter}
+          activeFilters={typeFilters}
+          onToggle={toggleTypeFilter}
+          onClear={() => setTypeFilters(new Set())}
         />
 
         {/* Center: Map */}
@@ -175,8 +199,9 @@ export default function Dashboard() {
         <HistogramPanel
           title="Location Category"
           items={categoryHistogram}
-          activeFilter={categoryFilter}
-          onFilter={setCategoryFilter}
+          activeFilters={categoryFilters}
+          onToggle={toggleCategoryFilter}
+          onClear={() => setCategoryFilters(new Set())}
         />
       </div>
 

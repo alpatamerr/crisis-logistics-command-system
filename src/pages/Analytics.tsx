@@ -1,7 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, Spinner, HTMLTable, Tag, Intent, Callout, Icon } from "@blueprintjs/core";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { TravelTime, JourneyPlan, AirQuality } from "@crisis-logistics-command-app/sdk";
+
+type SortDir = "asc" | "desc";
 
 function MetricCard({ title, value, subtitle, intent, icon, loading }: {
   title: string;
@@ -26,6 +28,9 @@ function MetricCard({ title, value, subtitle, intent, icon, loading }: {
 }
 
 export default function Analytics() {
+  const [ttSort, setTtSort] = useState<SortDir>("asc");
+  const [jpSort, setJpSort] = useState<SortDir>("asc");
+
   const travelTimes = useOsdkObjects(TravelTime, {
     orderBy: { travelTimeSeconds: "asc" },
     pageSize: 50,
@@ -35,6 +40,26 @@ export default function Analytics() {
     pageSize: 50,
   });
   const airQuality = useOsdkObjects(AirQuality, { pageSize: 10 });
+
+  const sortedTravelTimes = useMemo(() => {
+    const data = [...(travelTimes.data ?? [])];
+    data.sort((a, b) => {
+      const aVal = Number(a.travelTimeSeconds ?? 0);
+      const bVal = Number(b.travelTimeSeconds ?? 0);
+      return ttSort === "asc" ? aVal - bVal : bVal - aVal;
+    });
+    return data;
+  }, [travelTimes.data, ttSort]);
+
+  const sortedJourneyPlans = useMemo(() => {
+    const data = [...(journeyPlans.data ?? [])];
+    data.sort((a, b) => {
+      const aVal = Number(a.durationMinutes ?? 0);
+      const bVal = Number(b.durationMinutes ?? 0);
+      return jpSort === "asc" ? aVal - bVal : bVal - aVal;
+    });
+    return data;
+  }, [journeyPlans.data, jpSort]);
 
   const hasError = travelTimes.error || journeyPlans.error || airQuality.error;
   const currentAQ = (airQuality.data ?? []).find(aq => aq.forecastType === "Current");
@@ -113,10 +138,20 @@ export default function Analytics() {
         {(travelTimes.data ?? []).length > 0 && (
           <HTMLTable bordered striped style={{ width: "100%" }}>
             <thead>
-              <tr><th>Hub</th><th>Incident</th><th>Travel Time</th><th>Distance</th></tr>
+              <tr>
+                <th>Hub</th>
+                <th>Incident</th>
+                <th
+                  style={{ cursor: "pointer", userSelect: "none" }}
+                  onClick={() => setTtSort(prev => prev === "asc" ? "desc" : "asc")}
+                >
+                  Travel Time <Icon icon={ttSort === "asc" ? "sort-asc" : "sort-desc"} size={12} />
+                </th>
+                <th>Distance</th>
+              </tr>
             </thead>
             <tbody>
-              {(travelTimes.data ?? []).map((tt) => (
+              {sortedTravelTimes.map((tt) => (
                 <tr key={tt.pairId}>
                   <td><strong>{tt.hubName ?? "—"}</strong></td>
                   <td style={{ fontSize: 12, fontFamily: "monospace" }}>{tt.ttIncidentId ?? "—"}</td>
@@ -156,10 +191,21 @@ export default function Analytics() {
         {(journeyPlans.data ?? []).length > 0 && (
           <HTMLTable bordered striped style={{ width: "100%" }}>
             <thead>
-              <tr><th>Origin</th><th>Destination</th><th>Duration</th><th>Modes</th><th>Summary</th></tr>
+              <tr>
+                <th>Origin</th>
+                <th>Destination</th>
+                <th
+                  style={{ cursor: "pointer", userSelect: "none" }}
+                  onClick={() => setJpSort(prev => prev === "asc" ? "desc" : "asc")}
+                >
+                  Duration <Icon icon={jpSort === "asc" ? "sort-asc" : "sort-desc"} size={12} />
+                </th>
+                <th>Modes</th>
+                <th>Summary</th>
+              </tr>
             </thead>
             <tbody>
-              {(journeyPlans.data ?? []).map((jp) => (
+              {sortedJourneyPlans.map((jp) => (
                 <tr key={jp.journeyId}>
                   <td><strong>{jp.originName ?? "—"}</strong></td>
                   <td><strong>{jp.destinationName ?? "—"}</strong></td>
