@@ -1,6 +1,7 @@
 import { Card, H4, Tag, Intent, Spinner, Callout } from "@blueprintjs/core";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { LiveIncident, LineStatus, CrisisResource, LiveTransportUnit } from "@crisis-logistics-command-app/sdk";
+import CrisisMap from "@/components/CrisisMap";
 
 function MetricCard({ title, value, intent, loading }: {
   title: string;
@@ -46,6 +47,9 @@ export default function Dashboard() {
         <MetricCard title="Low Resources" value={lowResources} intent={lowResources > 0 ? Intent.DANGER : Intent.SUCCESS} loading={resources.isLoading} />
         <MetricCard title="Transport Units" value={unitCount} intent={Intent.PRIMARY} loading={units.isLoading} />
       </div>
+
+      <H4 style={{ marginTop: 24 }}>Situation Map</H4>
+      <CrisisMap />
 
       <H4 style={{ marginTop: 24 }}>Recent Incidents</H4>
       <div className="table-container">
