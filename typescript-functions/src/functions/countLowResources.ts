@@ -2,6 +2,11 @@ import { Client, ObjectSet } from "@osdk/client";
 import { Integer } from "@osdk/functions";
 import { CrisisResource } from "@ontology/sdk";
 
+export const config = {
+    apiName: "countLowResources",
+    description: "Returns the count of Crisis Resources where quantity is below critical threshold.",
+};
+
 async function countLowResources(
     client: Client,
     resources: ObjectSet<CrisisResource>

@@ -1,6 +1,11 @@
 import { Client, ObjectSet, ObjectSpecifier } from "@osdk/client";
 import { CrisisResource } from "@ontology/sdk";
 
+export const config = {
+    apiName: "isBelowThreshold",
+    description: "Returns whether each Crisis Resource quantity is below its critical threshold.",
+};
+
 interface ThresholdStatus {
     isBelowThreshold: boolean;
 }
