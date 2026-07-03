@@ -1,7 +1,7 @@
 import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { LiveIncident, LiveLocation } from "@crisis-logistics-command-app/sdk";
-import "leaflet/dist/leaflet.css";
+
 
 const WEST_LONDON_CENTER: [number, number] = [51.49, -0.35];
 const ZOOM = 12;

@@ -1,7 +1,29 @@
+import { lazy, Suspense, Component, type ReactNode } from "react";
 import { Card, H4, Tag, Intent, Spinner, Callout } from "@blueprintjs/core";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { LiveIncident, LineStatus, CrisisResource, LiveTransportUnit } from "@crisis-logistics-command-app/sdk";
-import CrisisMap from "@/components/CrisisMap";
+
+const CrisisMap = lazy(() => import("@/components/CrisisMap"));
+
+class MapErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Callout intent={Intent.WARNING} title="Map unavailable">
+          The map could not be loaded. Data is still available in the tables below.
+        </Callout>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function MetricCard({ title, value, intent, loading }: {
   title: string;
@@ -49,7 +71,11 @@ export default function Dashboard() {
       </div>
 
       <H4 style={{ marginTop: 24 }}>Situation Map</H4>
-      <CrisisMap />
+      <MapErrorBoundary>
+        <Suspense fallback={<Spinner />}>
+          <CrisisMap />
+        </Suspense>
+      </MapErrorBoundary>
 
       <H4 style={{ marginTop: 24 }}>Recent Incidents</H4>
       <div className="table-container">
