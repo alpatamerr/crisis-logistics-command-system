@@ -224,7 +224,7 @@ export default function Dashboard() {
       )}
 
       {/* ─── Filter Bar: Severity chips + Time range ─── */}
-      <Card style={{ marginBottom: 12, padding: "10px 16px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+      <Card style={{ marginBottom: 12, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
         {/* Severity filter chips */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: "#5c7080", marginRight: 4 }}>Severity:</span>

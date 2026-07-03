@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useMemo } from "react";
-import { Card, Tag, Intent, Spinner, HTMLTable, InputGroup, Callout, Icon, Button, ButtonGroup } from "@blueprintjs/core";
+import { Card, Tag, Intent, Spinner, HTMLTable, InputGroup, Callout, Icon, Button, HTMLSelect } from "@blueprintjs/core";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { LiveIncident } from "@crisis-logistics-command-app/sdk";
 
@@ -156,26 +156,18 @@ export default function ActiveIncidents() {
 
           <div style={{ width: 1, height: 16, background: "#d8e1e8" }} />
 
-          {/* Type filter dropdown as pills */}
-          <ButtonGroup minimal>
-            <Button
-              text="All Types"
-              small
-              active={typeFilter === null}
-              intent={typeFilter === null ? Intent.PRIMARY : Intent.NONE}
-              onClick={() => { setTypeFilter(null); setVisibleCount(PAGE_SIZE); }}
-            />
-            {incidentTypes.slice(0, 5).map(t => (
-              <Button
-                key={t}
-                text={t}
-                small
-                active={typeFilter === t}
-                intent={typeFilter === t ? Intent.PRIMARY : Intent.NONE}
-                onClick={() => { setTypeFilter(typeFilter === t ? null : t); setVisibleCount(PAGE_SIZE); }}
-              />
+          {/* Type filter dropdown */}
+          <HTMLSelect
+            value={typeFilter ?? ""}
+            onChange={(e) => { setTypeFilter(e.target.value || null); setVisibleCount(PAGE_SIZE); }}
+            minimal
+            style={{ fontSize: 12 }}
+          >
+            <option value="">All Types</option>
+            {incidentTypes.map(t => (
+              <option key={t} value={t}>{t}</option>
             ))}
-          </ButtonGroup>
+          </HTMLSelect>
 
           {activeFilterCount > 0 && (
             <>
