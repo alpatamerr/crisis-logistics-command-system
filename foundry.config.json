@@ -4,8 +4,7 @@
     "application": "ri.third-party-applications.main.application.7984d417-ec31-488f-b863-3069fe3fc74d",
     "directory": "./dist",
     "autoVersion": {
-      "type": "git-describe",
-      "tagPrefix": ""
+      "type": "package-json"
     },
     "uploadOnly": false
   }
