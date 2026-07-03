@@ -3,9 +3,8 @@ import {
   APIProvider,
   Map,
   useMap,
-  AdvancedMarker,
+  Marker,
   InfoWindow,
-  useAdvancedMarkerRef,
 } from "@vis.gl/react-google-maps";
 
 // ─── Types ───
@@ -53,6 +52,16 @@ const SEVERITY_ORDER: Record<string, number> = {
   Minimal: 3,
 };
 
+// ─── SVG marker icon creator ───
+function createSvgMarkerUrl(color: string, size: number): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="${color}" stroke="white" stroke-width="2.5"/>
+  </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+const LOCATION_ICON_URL = createSvgMarkerUrl("#8A9BA8", 12);
+
 // ─── FitBounds component ───
 function FitBounds({
   incidents,
@@ -86,7 +95,7 @@ function FitBounds({
     });
 
     if (hasPoints) {
-      map.fitBounds(bounds, { top: 30, right: 30, bottom: 30, left: 30 });
+      map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
       hasFitted.current = true;
     }
   }, [map, incidents, locations]);
@@ -94,36 +103,12 @@ function FitBounds({
   return null;
 }
 
-// ─── Location dot marker ───
-function LocationDot({ loc }: { loc: LocationData }) {
-  if (loc.latitude == null || loc.longitude == null) {
-    return null;
-  }
-  return (
-    <AdvancedMarker
-      position={{ lat: loc.latitude, lng: loc.longitude }}
-      title={loc.locationName ?? loc.locationId ?? ""}
-    >
-      <div
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: "50%",
-          background: "#8A9BA8",
-          opacity: 0.45,
-          border: "1px solid #5C7080",
-        }}
-      />
-    </AdvancedMarker>
-  );
-}
-
 // ─── Incident marker with InfoWindow ───
 function IncidentMarker({ inc }: { inc: IncidentData }) {
   const [open, setOpen] = useState(false);
-  const [markerRef, marker] = useAdvancedMarkerRef();
 
   const color = SEVERITY_COLORS[inc.severityLevel ?? ""] ?? "#5C7080";
+  const iconUrl = useMemo(() => createSvgMarkerUrl(color, 22), [color]);
 
   const handleClick = useCallback(() => {
     setOpen((prev) => !prev);
@@ -137,29 +122,23 @@ function IncidentMarker({ inc }: { inc: IncidentData }) {
     return null;
   }
 
+  const position = { lat: inc.latitude, lng: inc.longitude };
+
   return (
     <>
-      <AdvancedMarker
-        ref={markerRef}
-        position={{ lat: inc.latitude, lng: inc.longitude }}
+      <Marker
+        position={position}
         title={`${inc.severityLevel} — ${inc.incidentType}`}
         onClick={handleClick}
-      >
-        <div
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: "50%",
-            background: color,
-            border: "2.5px solid #fff",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.35)",
-            cursor: "pointer",
-          }}
-        />
-      </AdvancedMarker>
+        icon={{
+          url: iconUrl,
+          scaledSize: new google.maps.Size(22, 22),
+          anchor: new google.maps.Point(11, 11),
+        }}
+      />
 
-      {open && marker && (
-        <InfoWindow anchor={marker} onCloseClick={handleClose}>
+      {open && (
+        <InfoWindow position={position} onCloseClick={handleClose}>
           <div style={{ minWidth: 220, padding: 4 }}>
             <strong style={{ color, fontSize: 13 }}>
               {inc.severityLevel}
@@ -218,7 +197,7 @@ export default function CrisisMap({
           fontSize: 14,
         }}
       >
-        Google Maps API key not configured (VITE_GOOGLE_MAPS_API_KEY)
+        Google Maps API key not configured
       </div>
     );
   }
@@ -242,19 +221,33 @@ export default function CrisisMap({
           defaultZoom={mapZoom}
           gestureHandling="greedy"
           disableDefaultUI={false}
-          mapId="crisis-map"
           style={{ width: "100%", height: "100%" }}
         >
           {center == null && (
             <FitBounds incidents={incidents} locations={locations} />
           )}
 
-          {/* Location markers (grey dots) */}
-          {locations.map((loc) => (
-            <LocationDot key={loc.locationId} loc={loc} />
-          ))}
+          {/* Location markers (small grey dots) */}
+          {locations.map((loc) => {
+            if (loc.latitude == null || loc.longitude == null) {
+              return null;
+            }
+            return (
+              <Marker
+                key={loc.locationId}
+                position={{ lat: loc.latitude, lng: loc.longitude }}
+                title={loc.locationName ?? loc.locationId ?? ""}
+                icon={{
+                  url: LOCATION_ICON_URL,
+                  scaledSize: new google.maps.Size(12, 12),
+                  anchor: new google.maps.Point(6, 6),
+                }}
+                opacity={0.5}
+              />
+            );
+          })}
 
-          {/* Incident markers (severity-colored) */}
+          {/* Incident markers (severity-colored circles) */}
           {sortedIncidents.map((inc) => (
             <IncidentMarker key={inc.incidentId} inc={inc} />
           ))}
