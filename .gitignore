@@ -1,5 +1,11 @@
 .node-installation/
 
+# Environment files (contain instance-specific config)
+.env.production
+.env.development
+.env.code-workspaces
+.env.local
+
 # Generated from @osdk/create-app CLI
 # Logs
 logs
