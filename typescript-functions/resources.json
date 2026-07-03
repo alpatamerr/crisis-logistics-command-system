@@ -1,17 +1,35 @@
 {
-  "resources" : {
-    "ontologies" : [ ],
-    "objects" : [ ],
-    "links" : [ ],
-    "interfaces" : [ ],
-    "queries" : [ ],
-    "osdks" : [ ],
-    "models" : [ ],
-    "custom" : { }
+  "resources": {
+    "ontologies": [
+      {
+        "identifier": {
+          "rid": "ri.ontology.main.ontology.6b27305a-f5ed-4dbe-8a54-dfecb1ddbcce"
+        },
+        "verbs": [
+          "ONTOLOGIES_READ"
+        ]
+      }
+    ],
+    "objects": [
+      {
+        "identifier": {
+          "rid": "ri.ontology.main.object-type.89c4f596-0386-40d3-b3c1-7947109aeffc"
+        },
+        "verbs": [
+          "ONTOLOGIES_READ"
+        ]
+      }
+    ],
+    "links": [],
+    "interfaces": [],
+    "queries": [],
+    "osdks": [],
+    "models": [],
+    "custom": {}
   },
-  "egress" : {
-    "connections" : [ ]
+  "egress": {
+    "connections": []
   },
-  "_comment" : "DO NOT DELETE THIS FILE. MODIFYING CONTENTS MANUALLY MAY RESULT IN COMPILE ERRORS",
-  "version" : 1
+  "_comment": "DO NOT DELETE THIS FILE. MODIFYING CONTENTS MANUALLY MAY RESULT IN COMPILE ERRORS",
+  "version": 1
 }
