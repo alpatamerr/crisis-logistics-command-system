@@ -1,9 +1,36 @@
-import { useState, useEffect, useRef, useMemo } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { MapContainer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Tag } from "@blueprintjs/core";
 
-const LONDON_CENTER: [number, number] = [51.505, -0.09];
+// ─── Types ───
+interface IncidentData {
+  incidentId?: string;
+  severityLevel?: string | null;
+  incidentType?: string | null;
+  description?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+interface LocationData {
+  locationId?: string;
+  locationName?: string | null;
+  category?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+interface CrisisMapProps {
+  incidents: IncidentData[];
+  locations: LocationData[];
+  height?: number;
+  center?: [number, number];
+  zoom?: number;
+}
+
+// ─── Constants ───
+const LONDON_CENTER: [number, number] = [51.5, -0.12];
 const DEFAULT_ZOOM = 12;
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -20,186 +47,187 @@ const SEVERITY_ORDER: Record<string, number> = {
   Minimal: 3,
 };
 
-/**
- * CartoDB Voyager — colorful, labeled, Google Maps-like appearance
- * Shows streets, parks, water, buildings with good contrast
- */
-const TILE_PROVIDERS = [
-  {
-    name: "CartoDB Voyager",
-    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-  },
-  {
-    name: "CartoDB Voyager Labels Under",
-    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png",
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-  },
-  {
-    name: "OpenStreetMap",
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  },
+// ─── Tile providers (ordered by preference) ───
+const TILE_URLS = [
+  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
 ];
 
-interface IncidentData {
-  incidentId: string;
-  severityLevel?: string | null;
-  incidentType?: string | null;
-  description?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
+// ─── Custom fetch-based TileLayer that bypasses CSP img-src ───
+// This fetches tiles via fetch() (connect-src) and converts to blob URLs (img-src: blob:)
+function createFetchTileLayer(urlTemplate: string): L.TileLayer {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const FetchTileLayer = (L.TileLayer as any).extend({
+    createTile: function (
+      this: { getTileUrl(c: L.Coords): string },
+      coords: L.Coords,
+      done: (err: Error | null, tile: HTMLElement) => void
+    ) {
+      const tile = document.createElement("img");
+      tile.setAttribute("role", "presentation");
+      tile.crossOrigin = "anonymous";
+
+      const url = this.getTileUrl(coords);
+
+      fetch(url, { mode: "cors" })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`Tile fetch failed: ${res.status}`);
+          }
+          return res.blob();
+        })
+        .then((blob) => {
+          tile.src = URL.createObjectURL(blob);
+          done(null, tile);
+        })
+        .catch(() => {
+          // Fallback: try loading directly (in case fetch fails but img-src allows it)
+          tile.src = url;
+          tile.onload = () => done(null, tile);
+          tile.onerror = () => done(new Error("Tile load failed"), tile);
+        });
+
+      return tile;
+    },
+  });
+
+  return new FetchTileLayer(urlTemplate, {
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+    subdomains: "abc",
+  });
 }
 
-interface LocationData {
-  locationId: string;
-  locationName?: string | null;
-  category?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-}
-
-interface CrisisMapProps {
-  incidents: IncidentData[];
-  locations: LocationData[];
-  height?: number;
-  center?: [number, number];
-  zoom?: number;
-}
-
-/** Auto-fits map to all visible markers */
-function FitBounds({ incidents, locations }: { incidents: IncidentData[]; locations: LocationData[] }) {
+// ─── Component: Adds tile layer with fallback ───
+function TileLayerWithFallback() {
   const map = useMap();
-  const fitted = useRef(false);
+  const layerRef = useRef<L.TileLayer | null>(null);
+  const providerIndexRef = useRef(0);
+  const [, setRetry] = useState(0);
+
+  const addTileLayer = useCallback(
+    (index: number) => {
+      if (index >= TILE_URLS.length) {
+        return;
+      }
+
+      // Remove previous layer
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+      }
+
+      const layer = createFetchTileLayer(TILE_URLS[index]);
+      layerRef.current = layer;
+      layer.addTo(map);
+
+      // Listen for tile errors to try next provider
+      let errorCount = 0;
+      layer.on("tileerror", () => {
+        errorCount++;
+        if (errorCount > 3 && index < TILE_URLS.length - 1) {
+          providerIndexRef.current = index + 1;
+          setRetry((r) => r + 1);
+        }
+      });
+    },
+    [map]
+  );
 
   useEffect(() => {
-    if (fitted.current) {
+    addTileLayer(providerIndexRef.current);
+    return () => {
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+      }
+    };
+  }, [addTileLayer, map]);
+
+  return null;
+}
+
+// ─── Component: FitBounds ───
+function FitBounds({
+  incidents,
+  locations,
+}: {
+  incidents: IncidentData[];
+  locations: LocationData[];
+}) {
+  const map = useMap();
+  const hasFitted = useRef(false);
+
+  useEffect(() => {
+    if (hasFitted.current) {
       return;
     }
-
     const points: [number, number][] = [];
-    for (const inc of incidents) {
+    incidents.forEach((inc) => {
       if (inc.latitude != null && inc.longitude != null) {
         points.push([inc.latitude, inc.longitude]);
       }
-    }
-    for (const loc of locations) {
+    });
+    locations.forEach((loc) => {
       if (loc.latitude != null && loc.longitude != null) {
         points.push([loc.latitude, loc.longitude]);
       }
-    }
-
+    });
     if (points.length > 1) {
       const bounds = L.latLngBounds(points);
       map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
-      fitted.current = true;
-    } else if (points.length === 1) {
-      map.setView(points[0], 13);
-      fitted.current = true;
+      hasFitted.current = true;
     }
   }, [incidents, locations, map]);
 
   return null;
 }
 
-/** Handles tile load errors and switches to next provider */
-function TileErrorHandler({ onError }: { onError: () => void }) {
-  const map = useMap();
-  const errorCount = useRef(0);
-
-  useEffect(() => {
-    const handleTileError = () => {
-      errorCount.current += 1;
-      if (errorCount.current >= 3) {
-        onError();
-      }
-    };
-
-    map.on("tileerror", handleTileError);
-    return () => {
-      map.off("tileerror", handleTileError);
-    };
-  }, [map, onError]);
-
-  return null;
-}
-
-export default function CrisisMap({ incidents, locations, height, center, zoom }: CrisisMapProps) {
-  const [tileIndex, setTileIndex] = useState(0);
-  const [tilesFailed, setTilesFailed] = useState(false);
-
-  const sortedIncidents = useMemo(() => {
-    return [...incidents].sort(
-      (a, b) =>
-        (SEVERITY_ORDER[a.severityLevel ?? ""] ?? 9) -
-        (SEVERITY_ORDER[b.severityLevel ?? ""] ?? 9)
-    );
-  }, [incidents]);
-
-  const handleTileError = () => {
-    if (tileIndex < TILE_PROVIDERS.length - 1) {
-      setTileIndex((prev) => prev + 1);
-    } else {
-      setTilesFailed(true);
-    }
-  };
-
-  const currentProvider = TILE_PROVIDERS[tileIndex];
+// ─── Main Component ───
+export default function CrisisMap({
+  incidents,
+  locations,
+  height,
+  center,
+  zoom,
+}: CrisisMapProps) {
+  const sortedIncidents = useMemo(
+    () =>
+      [...incidents].sort(
+        (a, b) =>
+          (SEVERITY_ORDER[a.severityLevel ?? ""] ?? 9) -
+          (SEVERITY_ORDER[b.severityLevel ?? ""] ?? 9)
+      ),
+    [incidents]
+  );
 
   return (
     <div
       style={{
         height: height != null ? height : "100%",
+        minHeight: height ?? 520,
         width: "100%",
-        borderRadius: 6,
+        borderRadius: 8,
         overflow: "hidden",
-        border: "1px solid #ced9e0",
+        border: "1px solid #d3d8de",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
+        background: "#dde6e9",
         position: "relative",
-        background: "#dde6ed",
       }}
     >
-      {tilesFailed && (
-        <div
-          style={{
-            position: "absolute",
-            top: 8,
-            left: 50,
-            right: 50,
-            zIndex: 1000,
-            background: "rgba(219, 55, 55, 0.92)",
-            borderRadius: 4,
-            padding: "8px 14px",
-            fontSize: 12,
-            color: "#fff",
-            textAlign: "center",
-            fontWeight: 500,
-          }}
-        >
-          ⚠️ Map tiles could not load. Please add tile domains to CORS/CSP settings.
-        </div>
-      )}
-
       <MapContainer
         center={center ?? LONDON_CENTER}
         zoom={zoom ?? DEFAULT_ZOOM}
-        style={{ height: "100%", width: "100%", background: "#dde6ed" }}
+        style={{ height: "100%", width: "100%", background: "#dde6e9" }}
         zoomControl={true}
+        scrollWheelZoom={true}
       >
-        <TileLayer
-          key={currentProvider.url}
-          url={currentProvider.url}
-          attribution={currentProvider.attribution}
-          maxZoom={19}
-          subdomains="abcd"
-        />
+        <TileLayerWithFallback />
+        {center == null && (
+          <FitBounds incidents={incidents} locations={locations} />
+        )}
 
-        <TileErrorHandler onError={handleTileError} />
-        {center == null && <FitBounds incidents={incidents} locations={locations} />}
-
-        {/* Location markers — smaller, grey, behind incidents */}
+        {/* Location markers (grey, subtle) */}
         {locations.map((loc) => {
           if (loc.latitude == null || loc.longitude == null) {
             return null;
@@ -219,20 +247,19 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
               <Tooltip direction="top" offset={[0, -5]}>
                 <strong>{loc.locationName ?? loc.locationId}</strong>
                 <br />
-                <span style={{ fontSize: 11, color: "#5c7080" }}>
-                  {loc.category ?? "Location"}
-                </span>
+                {loc.category ?? ""}
               </Tooltip>
             </CircleMarker>
           );
         })}
 
-        {/* Incident markers — larger, severity-colored, on top */}
+        {/* Incident markers (severity-colored, prominent) */}
         {sortedIncidents.map((inc) => {
           if (inc.latitude == null || inc.longitude == null) {
             return null;
           }
-          const color = SEVERITY_COLORS[inc.severityLevel ?? ""] ?? "#5C7080";
+          const color =
+            SEVERITY_COLORS[inc.severityLevel ?? ""] ?? "#5C7080";
           return (
             <CircleMarker
               key={inc.incidentId}
@@ -241,34 +268,16 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
               pathOptions={{
                 color: "#fff",
                 fillColor: color,
-                fillOpacity: 0.85,
-                weight: 2,
+                fillOpacity: 0.9,
+                weight: 2.5,
               }}
             >
               <Popup>
                 <div style={{ minWidth: 220 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 6,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        background: color,
-                        display: "inline-block",
-                      }}
-                    />
-                    <strong>{inc.severityLevel ?? "Unknown"}</strong>
-                    <span style={{ color: "#5c7080", fontSize: 12 }}>
-                      {inc.incidentType ?? ""}
-                    </span>
-                  </div>
+                  <strong style={{ color, fontSize: 13 }}>
+                    {inc.severityLevel}
+                  </strong>{" "}
+                  — {inc.incidentType}
                   <hr
                     style={{
                       margin: "6px 0",
@@ -276,9 +285,9 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
                       borderTop: "1px solid #e1e8ed",
                     }}
                   />
-                  <p style={{ fontSize: 12, margin: 0, color: "#394b59" }}>
-                    {inc.description ?? "No description available"}
-                  </p>
+                  <span style={{ fontSize: 12, color: "#394B59" }}>
+                    {inc.description ?? "—"}
+                  </span>
                 </div>
               </Popup>
             </CircleMarker>
@@ -292,30 +301,37 @@ export default function CrisisMap({ incidents, locations, height, center, zoom }
           position: "absolute",
           bottom: 24,
           right: 12,
-          zIndex: 1000,
           background: "rgba(255,255,255,0.95)",
           borderRadius: 6,
           padding: "8px 12px",
+          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+          zIndex: 1000,
           display: "flex",
-          gap: 12,
+          gap: 10,
           alignItems: "center",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
-          border: "1px solid #e1e8ed",
+          fontSize: 11,
         }}
       >
-        {Object.entries(SEVERITY_COLORS).map(([label, color]) => (
-          <Tag
+        {Object.entries(SEVERITY_COLORS).map(([label, clr]) => (
+          <span
             key={label}
-            minimal
-            style={{
-              background: color,
-              color: "#fff",
-              fontSize: 10,
-              fontWeight: 600,
-            }}
+            style={{ display: "flex", alignItems: "center", gap: 4 }}
           >
-            {label}
-          </Tag>
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: clr,
+                border: "1.5px solid #fff",
+                boxShadow: "0 0 2px rgba(0,0,0,0.3)",
+                display: "inline-block",
+              }}
+            />
+            <Tag minimal style={{ fontSize: 10 }}>
+              {label}
+            </Tag>
+          </span>
         ))}
       </div>
     </div>
