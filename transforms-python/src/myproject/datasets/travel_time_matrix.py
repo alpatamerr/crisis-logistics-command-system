@@ -27,12 +27,22 @@ OUTPUT_SCHEMA = {
     "travel_time_text": pl.Utf8,
     "distance_meters": pl.Int64,
     "distance_text": pl.Utf8,
+    "pair_id": pl.Utf8,
 }
 
 
 def _empty_df():
     """Return an empty DataFrame with the expected schema."""
     return pl.DataFrame({k: pl.Series([], dtype=v) for k, v in OUTPUT_SCHEMA.items()})
+
+
+def _ensure_pair_id(df):
+    """Ensure pair_id column exists on a DataFrame."""
+    if "pair_id" not in df.columns:
+        df = df.with_columns(
+            (pl.col("hub_id") + "___" + pl.col("incident_id")).alias("pair_id")
+        )
+    return df
 
 
 @incremental(snapshot_inputs=["hubs", "incidents"])
@@ -113,7 +123,7 @@ def compute(ctx, hubs, incidents, output, source):
 
     if not needed_pairs:
         logger.info("All pairs cached — no API calls needed")
-        output.write_table(valid_cached)
+        output.write_table(_ensure_pair_id(valid_cached))
         return
 
     # --- 4. Calculate new pairs with hard limit ---
@@ -213,10 +223,8 @@ def compute(ctx, hubs, incidents, output, source):
     # Deduplicate (prefer new results over stale cache)
     combined = combined.unique(subset=["hub_id", "incident_id"], keep="last")
 
-    # Add primary key column for object type backing
-    combined = combined.with_columns(
-        (pl.col("hub_id") + "___" + pl.col("incident_id")).alias("pair_id")
-    )
+    # Ensure primary key column for object type backing
+    combined = _ensure_pair_id(combined)
 
     output.write_table(combined)
     logger.info(f"Written {combined.height} total travel time entries")
