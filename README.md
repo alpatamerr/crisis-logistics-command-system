@@ -18,7 +18,7 @@ A full-stack real-time crisis logistics platform for West London, built on **Pal
 flowchart TB
     subgraph APIs["🌐 External APIs"]
         direction LR
-        TfL["TfL Unified API"] ~~~ Google["Google Maps Platform"] ~~~ AQ["Air Quality API"]
+        TfL["TfL Unified API"] ~~~ Google["Google Maps Platform"] ~~~ AQ["Air Quality API"] ~~~ AL["Airlabs Aviation"]
     end
 
     DC["📡 Data Connection"]
@@ -50,24 +50,28 @@ flowchart TB
     Actions --> Functions
 ```
 
-
-
 ## 📊 Data Pipeline (`pipelines/`)
 
-15 Python transforms pulling live data from external APIs:
+17 Python transforms pulling live data from external APIs:
 
 | Transform | Source | Output |
 |-----------|--------|--------|
+| `airlabs_processor` | Airlabs API | Aircraft/helicopter positions |
+| `current_incidents` | TfL Unified API | Current incidents snapshot |
+| `infrastructure_discovery` | Google Maps Places | LiveLocation objects |
+| `route_directions` | Google Directions | Route data |
+| `tfl_air_quality_processor` | TfL API | AirQuality objects |
+| `tfl_bikepoints_processor` | TfL API | Bike docking stations |
+| `tfl_bus_arrivals_processor` | TfL API | BusArrival objects |
 | `tfl_incident_processor` | TfL Unified API | LiveIncident objects |
+| `tfl_journey_planner_processor` | TfL API | JourneyPlan objects |
 | `tfl_line_status_processor` | TfL API | LineStatus objects |
 | `tfl_road_status_processor` | TfL API | RoadStatus objects |
-| `tfl_bus_arrivals_processor` | TfL API | BusArrival objects |
-| `tfl_journey_planner_processor` | TfL API | JourneyPlan objects |
-| `tfl_air_quality_processor` | TfL API | AirQuality objects |
-| `infrastructure_discovery` | Google Maps Places | LiveLocation objects |
+| `tfl_stations_processor` | TfL API | Station data |
+| `tfl_train_positions` | TfL API | Train positions |
+| `tfl_vehicle_positions` | TfL API | Vehicle positions |
 | `travel_time_matrix` | Google Distance Matrix | TravelTime objects |
-| `route_directions` | Google Directions | Route data |
-| `unified_fleet` | TfL API | LiveTransportUnit objects |
+| `unified_fleet` | Multiple sources | LiveTransportUnit objects |
 | `unified_locations` | Multiple sources | Consolidated locations |
 
 All API keys are stored securely in Foundry's secret vault — no hardcoded credentials.
