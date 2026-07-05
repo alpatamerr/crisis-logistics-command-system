@@ -2,6 +2,8 @@
 
 A real-time crisis logistics management platform built on Palantir Foundry, providing unified situational awareness across transport networks, incident tracking, resource management, and fleet operations for West London.
 
+> 📂 This is the **data pipeline layer**. See the [root README](../README.md) for full system overview and the [frontend/](../frontend) directory for the React application.
+
 ![Platform](https://img.shields.io/badge/Platform-Palantir%20Foundry-black)
 ![Language](https://img.shields.io/badge/Transforms-Python%20%7C%20Polars-blue)
 ![Functions](https://img.shields.io/badge/Functions-TypeScript%20V2-purple)
@@ -29,7 +31,7 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        DATA SOURCES (APIs)                           │
+│                        DATA SOURCES (APIs)                          │
 ├──────────────────┬──────────────────────┬───────────────────────────┤
 │   TfL Open Data  │  Google Maps Platform │     Airlabs Aviation     │
 │  - Disruptions   │  - Distance Matrix    │  - Flight Positions      │
@@ -45,7 +47,7 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     TRANSFORM LAYER (Python/Polars)                  │
+│                     TRANSFORM LAYER (Python/Polars)                 │
 ├─────────────────────────────────────────────────────────────────────┤
 │  01_raw_ingestion    → External API calls, response parsing         │
 │  02_clean_derived    → Deduplication, caching, enrichment           │
@@ -54,7 +56,7 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      ONTOLOGY LAYER (10 Object Types)                │
+│                      ONTOLOGY LAYER (10 Object Types)               │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Live Incident │ Location │ Transport Unit │ Line Status │ Road     │
 │  Bus Arrival   │ Crisis Resource │ Travel Time │ Journey Plan │ Air │
@@ -62,10 +64,10 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                   APPLICATION LAYER (Workshop)                       │
+│                   APPLICATION LAYER (Workshop / React OSDK App)     │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Tab 1: Situation Map    │  Tab 2: Active Incidents                 │
-│  Tab 3: Transport Status │  Tab 4: Resources & Fleet               │
+│  Tab 3: Transport Status │  Tab 4: Resources & Fleet                │
 │  Tab 5: Analytics        │                                          │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -106,7 +108,9 @@ Longitude: -0.51 — -0.17
 
 ---
 
-## Workshop Application (5 Tabs)
+## React OSDK / Workshop Application (5 Tabs)
+
+> See [`frontend/`](../frontend) for the full React source code.
 
 ### Tab 1: Situation Map
 - Interactive map with dual layers: Incidents (severity-colored triangles) + Locations (subtle grey dots)
