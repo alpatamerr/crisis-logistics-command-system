@@ -43,7 +43,7 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
 │  - Air Quality   │                       │                          │
 │  - Bikepoints    │                       │                          │
 │  - Stations      │                       │                          │
-└──────────────────┴──────────────────────┴───────────────────────────┘
+└──────────────────┴───────────────────────┴──────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -218,7 +218,7 @@ transforms-python/
 
 | Component | Technology |
 |-----------|-----------|
-| **Platform** | Palantir Foundry |
+| **Platform** | Palantir Foundry / React OSDK |
 | **Transforms** | Python 3.11+ / Polars / Pandas |
 | **Functions** | TypeScript V2 (`@osdk/functions`) |
 | **Application** | Foundry Workshop |
