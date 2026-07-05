@@ -1,0 +1,34 @@
+buildscript {
+    repositories {
+        maven {
+            credentials {
+                username ''
+                password transformsBearerToken
+            }
+            authentication {
+                basic(BasicAuthentication)
+            }
+            url project.transformsMavenProxyRepoUri
+        }
+    }
+
+    dependencies {
+        classpath "com.palantir.transforms.python:lang-python-gradle-plugin:${transformsLangPythonPluginVersion}"
+    }
+}
+
+apply plugin: 'com.palantir.transforms.lang.python-defaults'
+
+// Apply the testing plugin
+// apply plugin: 'com.palantir.transforms.lang.pytest-defaults'
+
+// Apply the formatting plugins
+// apply plugin: 'com.palantir.transforms.lang.format-code-black'
+// apply plugin: 'com.palantir.transforms.lang.format-code-ruff'
+
+// Apply the linting plugins
+// apply plugin: 'com.palantir.conda.pep8'
+// apply plugin: 'com.palantir.conda.pylint'
+
+// Apply the anti-pattern linter
+// apply plugin: 'com.palantir.transforms.lang.antipattern-linter'

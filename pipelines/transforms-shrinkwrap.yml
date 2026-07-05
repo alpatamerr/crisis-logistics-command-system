@@ -1,0 +1,127 @@
+---
+mappings:
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/nearby_infrastructure"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.0188eb65-eb2f-4b4f-8a72-c0003eb00b7b"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/raw_live_incidents"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.26801c50-1ffa-46d5-be54-c9c6d3a47066"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/route_directions"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.1720225d-8959-4484-b6bc-9fc82e89c688"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_air_quality"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.d0ae71f4-8f43-4d34-ac89-25966338b6c8"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_bikepoints"
+  modes:
+  - "BUILD"
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.6f9dd1ed-401f-4838-a603-53537ec85d70"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_bus_arrivals"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.22f507fd-89f0-42d5-8e00-38c7022ee75e"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_journey_plans"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.a9cef37b-13f9-40fa-9987-09e3a58b7851"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_line_status"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.e8cc902b-f84f-4b3e-8eec-0f7bf276bb48"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_road_status"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.b821f22a-2559-4881-9401-b6ec29aa0280"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_train_positions"
+  modes:
+  - "BUILD"
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.53fcb88a-d188-4cb8-9283-8a0b04061eea"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/tfl_vehicle_positions"
+  modes:
+  - "BUILD"
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.ff16028e-c0ce-4835-8656-2e667e4ee285"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/travel_time_matrix"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.9317b51d-b1b3-41dd-8f1d-c7c3e1345996"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/validated_logistics_hubs"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.4bc28207-5239-4f47-99f5-805da54d8e89"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/03_ontology_backings/current_incidents"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.0fceecd4-5c54-461c-a67f-a0fc07d03dbc"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/03_ontology_backings/unified_locations"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.e1b4a1bf-ea40-42e2-91ed-4a20c10cff24"
+- alias: "ri.foundry.main.dataset.0188eb65-eb2f-4b4f-8a72-c0003eb00b7b"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.0188eb65-eb2f-4b4f-8a72-c0003eb00b7b"
+- alias: "ri.foundry.main.dataset.26801c50-1ffa-46d5-be54-c9c6d3a47066"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.26801c50-1ffa-46d5-be54-c9c6d3a47066"
+- alias: "ri.foundry.main.dataset.380832ab-a9ed-47f7-a5a9-c9df05e43938"
+  modes:
+  - "BUILD"
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.380832ab-a9ed-47f7-a5a9-c9df05e43938"
+- alias: "ri.foundry.main.dataset.4bc28207-5239-4f47-99f5-805da54d8e89"
+  modes:
+  - "BUILD"
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.4bc28207-5239-4f47-99f5-805da54d8e89"
+- alias: "ri.foundry.main.dataset.a774feec-e2a6-4f7e-8d14-279efe3f34ac"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.a774feec-e2a6-4f7e-8d14-279efe3f34ac"
+- alias: "ri.magritte..source.0049ef11-1810-4389-96bb-de55ac0f528f"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.magritte..source.0049ef11-1810-4389-96bb-de55ac0f528f"
+- alias: "ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.magritte..source.4d9c8591-4c74-46a9-b3f6-cc55aa1f9208"
+- alias: "ri.magritte..source.acf9fdf5-72dd-43fa-a501-2b418215791c"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.magritte..source.acf9fdf5-72dd-43fa-a501-2b418215791c"
+- alias: "ri.transforms.python.semantic.version"
+  modes:
+  - "READ"
+  path: "/deprecated-field"
+  rid: "ri.transforms.python.semantic.version"

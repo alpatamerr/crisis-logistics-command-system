@@ -1,0 +1,20 @@
+buildscript {
+    repositories {
+        maven {
+            credentials {
+                username ''
+                password project.transformsBearerToken
+            }
+            authentication {
+                basic(BasicAuthentication)
+            }
+            url project.transformsMavenProxyRepoUri
+        }
+    }
+
+    dependencies {
+        classpath "com.palantir.transforms:transforms-gradle-plugin:${transformsVersion}"
+    }
+}
+
+apply plugin: 'com.palantir.transforms-defaults'
