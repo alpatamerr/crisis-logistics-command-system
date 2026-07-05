@@ -1,0 +1,71 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-navbar {
+  background: #1c2127 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+  z-index: 20;
+}
+
+.nav-icon {
+  color: #ff6b6b;
+  margin-right: 10px;
+}
+
+.nav-title {
+  color: #f5f8fa;
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.app-content {
+  flex: 1;
+  padding: 52px 0 0 0;
+  overflow-y: auto;
+  background: #f6f7f9;
+}
+
+/* Tabs */
+.app-tabs .bp5-tab-list {
+  background: #fff;
+  padding: 0 20px;
+  border-bottom: 2px solid #e1e8ed;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-tabs .bp5-tab {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+  padding: 10px 16px;
+}
+
+.app-tabs .bp5-tab[aria-selected="true"] {
+  color: #2d72d2;
+  box-shadow: inset 0 -3px 0 #2d72d2;
+}
+
+.app-tabs .bp5-tab-panel {
+  margin-top: 0;
+  padding: 16px 20px;
+}
+
+/* Footer */
+.app-footer {
+  padding: 6px 16px;
+  text-align: center;
+  font-size: 10px;
+  color: #a7b6c2;
+  font-style: italic;
+  background: #1c2127;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+}

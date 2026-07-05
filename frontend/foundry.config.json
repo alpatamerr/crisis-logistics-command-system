@@ -1,0 +1,11 @@
+{
+  "foundryUrl": "https://atamer-labs.euw-3.palantirfoundry.co.uk",
+  "site": {
+    "application": "ri.third-party-applications.main.application.7984d417-ec31-488f-b863-3069fe3fc74d",
+    "directory": "./dist",
+    "autoVersion": {
+      "type": "package-json"
+    },
+    "uploadOnly": false
+  }
+}
