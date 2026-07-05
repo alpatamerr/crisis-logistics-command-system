@@ -112,4 +112,3 @@ TypeScript v2 Foundry Functions providing server-side logic for:
 ## 📝 License
 
 This project is proprietary and built on Palantir Foundry.
-```
