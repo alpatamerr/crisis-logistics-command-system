@@ -304,5 +304,3 @@ All API keys are retrieved at runtime via `source.get_secret()` from Foundry's s
 Proprietary, built for demonstration purposes.
 
 ---
-
-4/4 tamam! Hepsini yapıştırdıysan GitHub artık güncel. 🎉
