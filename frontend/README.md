@@ -4,7 +4,7 @@ A real-time operational dashboard for monitoring and managing crisis logistics a
 
 > 📂 This is the **React frontend**. See the [root README](../README.md) for full system overview and the [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed technical design.
 
-![React](https://img.shields.io/badge/React-19-blue) ![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue) ![Vite](https://img.shields.io/badge/Vite-7-purple) ![Blueprint](https://img.shields.io/badge/BlueprintJS-6-green)
+![React](https://img.shields.io/badge/React-19-blue) ![TypeScript](https://img.shields.io/badge/TypeScript-6-blue) ![Vite](https://img.shields.io/badge/Vite-8-purple) ![Blueprint](https://img.shields.io/badge/BlueprintJS-6-green)
 
 ## 🎯 Overview
 
@@ -15,13 +15,14 @@ The Crisis Logistics Command Center provides real-time situational awareness for
 - **Resource inventory management** with CRUD operations and low-stock alerts
 - **Route analytics** with travel times and journey planning data
 - **Air quality monitoring** with current and forecasted conditions
+- **⚡ PySpark-powered analytics** — incident trends, peak disruption hours, geographic hotspots
 
 ## 🏗️ Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| **Framework** | React 19 + TypeScript 5.5 |
-| **Build** | Vite 7 |
+| **Framework** | React 19 + TypeScript 6 |
+| **Build** | Vite 8 (Rolldown bundler, ~430ms builds) |
 | **UI Components** | BlueprintJS 6 (Palantir's design system) |
 | **Data Layer** | Palantir OSDK (`@osdk/react` experimental hooks) |
 | **Maps** | Leaflet + react-leaflet 5 (CartoDB Voyager tiles) |
@@ -51,12 +52,12 @@ src/
     ├── ActiveIncidents.tsx     # Tab 2: Incident table with detail panel + mini-map
     ├── TransportStatus.tsx     # Tab 3: Disrupted lines, roads, bus arrivals
     ├── ResourcesFleet.tsx      # Tab 4: Resource CRUD + fleet monitoring
-    └── Analytics.tsx           # Tab 5: Travel times, journey plans, air quality
+    └── Analytics.tsx           # Tab 5: Travel times, journey plans, air quality, PySpark analytics
 ```
 
 ## 🗄️ Ontology Data Model
 
-### Object Types (10)
+### Object Types (13)
 
 | Object Type | Primary Key | Description |
 |-------------|-------------|-------------|
@@ -70,6 +71,9 @@ src/
 | `TravelTime` | `pairId` | Calculated travel times between hubs and incidents |
 | `JourneyPlan` | `journeyId` | Multi-modal route plans |
 | `AirQuality` | `forecastType` | Current and forecasted air quality bands |
+| ⚡ `IncidentTrend` | `trendId` | Daily trends with 7-day rolling averages (PySpark) |
+| ⚡ `PeakHourHeatmap` | `heatmapId` | Hour × day disruption frequency matrix (PySpark) |
+| ⚡ `TransportHotspot` | `gridCell` | Geographic hotspot detection with severity scoring (PySpark) |
 
 ### Action Types (3)
 
@@ -106,6 +110,9 @@ Master-detail split layout:
 - **3 metric cards**: Air Quality, Avg Travel Time, Routes Calculated
 - **Travel Times table**: sortable by travel time, searchable by hub name
 - **Journey Plans table**: sortable by duration, filterable by transport mode
+- ⚡ **Incident Trends**: daily counts by severity with 7-day rolling averages (PySpark)
+- ⚡ **Peak Disruption Hours**: hour × day-of-week frequency matrix (PySpark)
+- ⚡ **Transport Hotspots**: ranked geographic areas by severity-weighted score (PySpark)
 
 ## 🚀 Getting Started
 
@@ -172,6 +179,7 @@ https://*.basemaps.cartocdn.com
 | **Google Maps Platform** | Travel times, distance calculations, journey planning |
 | **Manual Entry** | Crisis resources (via OSDK Actions) |
 | **Air Quality API** | London air quality forecasts |
+| **⚡ PySpark Analytics** | Incident trends, peak hours, transport hotspots |
 
 ## 🛠️ Key Technical Decisions
 
@@ -180,7 +188,8 @@ https://*.basemaps.cartocdn.com
 3. **Client-side filtering and sorting** — all data loaded via OSDK, then filtered/sorted in-memory for instant UI response
 4. **BlueprintJS** — Palantir's own design system ensures visual consistency with Foundry Workshop
 5. **Lazy-loaded map** — `CrisisMap` uses `React.lazy()` to avoid blocking initial page load
+6. **Vite 8 + Rolldown** — Rust-based bundler for ~430ms production builds (10x faster than Vite 7)
 
 ## 📝 License
 
-This project is proprietary and built on Palantir Foundry.
+Proprietary, built for demonstration purposes.
