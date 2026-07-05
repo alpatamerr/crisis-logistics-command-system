@@ -1,10 +1,20 @@
 ---
 mappings:
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/incident_trend_analysis"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.6327635c-e5e9-41f6-890a-66f42066e40f"
 - alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/nearby_infrastructure"
   modes:
   - "BUILD"
   path: "/deprecated-field"
   rid: "ri.foundry.main.dataset.0188eb65-eb2f-4b4f-8a72-c0003eb00b7b"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/peak_hour_heatmap"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.b1d30afb-e1fb-4682-ab7e-997b780561ba"
 - alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/raw_live_incidents"
   modes:
   - "BUILD"
@@ -58,6 +68,11 @@ mappings:
   - "READ"
   path: "/deprecated-field"
   rid: "ri.foundry.main.dataset.ff16028e-c0ce-4835-8656-2e667e4ee285"
+- alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/transport_reliability"
+  modes:
+  - "BUILD"
+  path: "/deprecated-field"
+  rid: "ri.foundry.main.dataset.affb778e-6829-4e4b-a6f7-ec052838d2ad"
 - alias: "/Atamer Systems-976c6b/Crisis Logistics Command System/02_clean_derived/travel_time_matrix"
   modes:
   - "BUILD"
