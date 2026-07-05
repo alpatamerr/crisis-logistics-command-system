@@ -33,11 +33,11 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        DATA SOURCES (APIs)                          │
-├──────────────────┬──────────────────────┬───────────────────────────┤
-│   TfL Open Data  │  Google Maps Platform │     Airlabs Aviation     │
+├──────────────────┬───────────────────────┬──────────────────────────┤
+│  TfL Open Data   │  Google Maps Platform │  Airlabs Aviation        │
 │  - Disruptions   │  - Distance Matrix    │  - Flight Positions      │
 │  - Line Status   │  - Route Directions   │  - ICAO Type Codes       │
-│  - Road Status   │                       │  - Helicopter Detection  │
+│  - Road Status   │  - Places (Nearby)    │  - Helicopter Detection  │
 │  - Bus Arrivals  │                       │                          │
 │  - Vehicle Pos.  │                       │                          │
 │  - Journey Plans │                       │                          │
@@ -82,7 +82,7 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
 | Source | API | Refresh Rate | Purpose |
 |--------|-----|-------------|---------|
 | **TfL Open Data** | `api.tfl.gov.uk` | 15 min | Transport disruptions, line/road status, bus arrivals, journey planning, air quality, bikepoints, stations |
-| **Google Maps Platform** | Distance Matrix API | Hourly | Travel times from logistics hubs to incident sites |
+| **Google Maps Platform** | Distance Matrix API, Places API | Hourly | Travel times from logistics hubs to incident sites |
 | **Airlabs** | `airlabs.co/api/v9/flights` | 15 min | Aircraft positions with ICAO type identification for helicopter detection |
 
 ### Bounding Box
