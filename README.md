@@ -14,7 +14,7 @@ A full-stack real-time crisis logistics platform for West London, built on **Pal
 
 ## 🎥 Demo
 
-> Screenshots and demo video coming soon.
+> [demo.mp4.zip](https://github.com/user-attachments/files/29681427/demo.mp4.zip)
 
 ## 🏗️ Architecture
 
