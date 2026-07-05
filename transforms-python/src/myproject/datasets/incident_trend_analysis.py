@@ -19,8 +19,12 @@ from pyspark.sql.window import Window
 def compute(raw_incidents):
     """Compute daily incident trends with rolling averages using PySpark."""
 
-    # Extract date from polled_at timestamp
-    df = raw_incidents.withColumn("incident_date", F.to_date(F.col("polled_at")))
+    # Extract date from polled_at timestamp, filter out null timestamps
+    df = (
+        raw_incidents
+        .filter(F.col("polled_at").isNotNull())
+        .withColumn("incident_date", F.to_date(F.col("polled_at")))
+    )
 
     # Deduplicate: one row per incident per day (avoid counting same incident multiple times)
     df_deduped = df.dropDuplicates(["incident_id", "incident_date"])

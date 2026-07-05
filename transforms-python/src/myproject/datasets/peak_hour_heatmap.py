@@ -17,9 +17,10 @@ from pyspark.sql import functions as F
 def compute(raw_incidents):
     """Compute hour × day_of_week incident frequency matrix using PySpark."""
 
-    # Extract temporal dimensions
+    # Extract temporal dimensions, filter out null timestamps
     df = (
         raw_incidents
+        .filter(F.col("polled_at").isNotNull())
         .withColumn("incident_date", F.to_date(F.col("polled_at")))
         .withColumn("hour_of_day", F.hour(F.col("polled_at")))
         .withColumn("day_of_week", F.dayofweek(F.col("polled_at")))  # 1=Sun, 7=Sat
