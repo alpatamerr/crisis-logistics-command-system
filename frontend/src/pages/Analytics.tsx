@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Card, Spinner, HTMLTable, Tag, Intent, Callout, Icon, InputGroup, Button } from "@blueprintjs/core";
 import { useOsdkObjects } from "@osdk/react/experimental";
-import { TravelTime, JourneyPlan, AirQuality } from "@crisis-logistics-command-app/sdk";
+import { TravelTime, JourneyPlan, AirQuality, IncidentTrend, PeakHourHeatmap, TransportHotspot } from "@crisis-logistics-command-app/sdk";
 
 type SortDir = "asc" | "desc";
 
@@ -42,6 +42,11 @@ export default function Analytics() {
     pageSize: 50,
   });
   const airQuality = useOsdkObjects(AirQuality, { pageSize: 10 });
+
+  // PySpark Analytics
+  const incidentTrends = useOsdkObjects(IncidentTrend, { orderBy: { incidentDate: "desc" }, pageSize: 50 });
+  const peakHours = useOsdkObjects(PeakHourHeatmap, { orderBy: { incidentCount: "desc" }, pageSize: 50 });
+  const hotspots = useOsdkObjects(TransportHotspot, { orderBy: { hotspotRank: "asc" }, pageSize: 20 });
 
   // Unique modes from journey plans
   const journeyModes = useMemo(() => {
@@ -279,6 +284,163 @@ export default function Analytics() {
                   <td style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, color: "#738694" }}>
                     {jp.legsSummary ?? "—"}
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </HTMLTable>
+        )}
+      </Card>
+
+      {/* ═══ PYSPARK ANALYTICS ═══ */}
+      <div style={{ marginTop: 24, marginBottom: 12 }}>
+        <Tag intent={Intent.WARNING} minimal icon="flash" style={{ fontSize: 11 }}>
+          Powered by Apache Spark
+        </Tag>
+      </div>
+
+      {/* Incident Trends */}
+      <div className="section-header">
+        <h4>
+          <Icon icon="trending-up" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
+          Incident Trends
+          {!incidentTrends.isLoading && (
+            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(incidentTrends.data ?? []).length}</Tag>
+          )}
+        </h4>
+      </div>
+      <Card className="panel-card" style={{ marginBottom: 20 }}>
+        {incidentTrends.isLoading && !incidentTrends.data && (
+          <div style={{ padding: 24, textAlign: "center" }}><Spinner /></div>
+        )}
+        {(incidentTrends.data ?? []).length > 0 && (
+          <HTMLTable bordered striped style={{ width: "100%" }}>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Severity</th>
+                <th>Count</th>
+                <th>7-Day Avg</th>
+                <th>Daily Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(incidentTrends.data ?? []).map((t) => (
+                <tr key={t.trendId}>
+                  <td style={{ fontFamily: "monospace", fontSize: 12 }}>{t.incidentDate ?? "—"}</td>
+                  <td>
+                    <Tag
+                      minimal
+                      intent={
+                        t.severityLevel === "Severe" ? Intent.DANGER :
+                        t.severityLevel === "Serious" ? Intent.WARNING :
+                        t.severityLevel === "Moderate" ? Intent.PRIMARY : Intent.NONE
+                      }
+                      style={{ fontSize: 11 }}
+                    >
+                      {t.severityLevel ?? "—"}
+                    </Tag>
+                  </td>
+                  <td><strong>{t.incidentCount ?? 0}</strong></td>
+                  <td style={{ color: "#2d72d2" }}>{t.rolling7dAvg ?? "—"}</td>
+                  <td style={{ color: "#738694" }}>{t.totalDailyCount ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </HTMLTable>
+        )}
+      </Card>
+
+      {/* Peak Hour Heatmap */}
+      <div className="section-header">
+        <h4>
+          <Icon icon="heat-grid" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
+          Peak Disruption Hours
+          {!peakHours.isLoading && (
+            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(peakHours.data ?? []).length}</Tag>
+          )}
+        </h4>
+      </div>
+      <Card className="panel-card" style={{ marginBottom: 20 }}>
+        {peakHours.isLoading && !peakHours.data && (
+          <div style={{ padding: 24, textAlign: "center" }}><Spinner /></div>
+        )}
+        {(peakHours.data ?? []).length > 0 && (
+          <HTMLTable bordered striped style={{ width: "100%" }}>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Hour</th>
+                <th>Incidents</th>
+                <th>Unique</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(peakHours.data ?? []).map((ph) => (
+                <tr key={ph.heatmapId}>
+                  <td><strong>{ph.dayName ?? "—"}</strong></td>
+                  <td style={{ fontFamily: "monospace" }}>{ph.hourOfDay != null ? `${String(ph.hourOfDay).padStart(2, "0")}:00` : "—"}</td>
+                  <td>
+                    <Tag
+                      minimal
+                      intent={Number(ph.incidentCount ?? 0) > 50 ? Intent.DANGER : Number(ph.incidentCount ?? 0) > 10 ? Intent.WARNING : Intent.NONE}
+                      style={{ fontSize: 11 }}
+                    >
+                      {ph.incidentCount ?? 0}
+                    </Tag>
+                  </td>
+                  <td style={{ color: "#738694" }}>{ph.uniqueIncidents ?? 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </HTMLTable>
+        )}
+      </Card>
+
+      {/* Transport Hotspots */}
+      <div className="section-header">
+        <h4>
+          <Icon icon="map-marker" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
+          Transport Hotspots
+          {!hotspots.isLoading && (
+            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(hotspots.data ?? []).length}</Tag>
+          )}
+        </h4>
+      </div>
+      <Card className="panel-card">
+        {hotspots.isLoading && !hotspots.data && (
+          <div style={{ padding: 24, textAlign: "center" }}><Spinner /></div>
+        )}
+        {(hotspots.data ?? []).length > 0 && (
+          <HTMLTable bordered striped style={{ width: "100%" }}>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Grid Cell</th>
+                <th>Incidents</th>
+                <th>Severity Score</th>
+                <th>Active Days</th>
+                <th>Type Diversity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(hotspots.data ?? []).map((hs) => (
+                <tr key={hs.gridCell}>
+                  <td>
+                    <Tag
+                      minimal
+                      intent={(hs.hotspotRank ?? 99) <= 3 ? Intent.DANGER : (hs.hotspotRank ?? 99) <= 7 ? Intent.WARNING : Intent.NONE}
+                      style={{ fontSize: 11 }}
+                    >
+                      #{hs.hotspotRank ?? "—"}
+                    </Tag>
+                  </td>
+                  <td style={{ fontFamily: "monospace", fontSize: 12 }}>
+                    {hs.gridLat?.toFixed(2)}, {hs.gridLng?.toFixed(2)}
+                  </td>
+                  <td><strong>{hs.totalIncidents ?? 0}</strong></td>
+                  <td style={{ color: "#c23030", fontWeight: 600 }}>{hs.weightedSeverityScore ?? 0}</td>
+                  <td>{hs.activeDays ?? 0}</td>
+                  <td>{hs.incidentTypeDiversity ?? 0}</td>
                 </tr>
               ))}
             </tbody>
