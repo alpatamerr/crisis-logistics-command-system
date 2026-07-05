@@ -136,26 +136,27 @@ Three distributed analytics transforms using Apache Spark (Window functions, piv
 > See [`frontend/`](../frontend) for the full React source code.
 
 ### Tab 1: Situation Map
-- Interactive map with dual layers: Incidents (severity-colored triangles) + Locations (subtle grey dots)
-- TYPE and CATEGORY filter histograms
+- Interactive map with dual layers: Incidents (severity-colored) + Locations
+- TYPE and CATEGORY filter histograms, severity chips, time range filter
 - KPI metrics: Disrupted Lines, Active Incidents, Low Resources, Transport Units
 
 ### Tab 2: Active Incidents
-- Sortable incident log with severity prioritization
-- Detail panel with properties, description, and mini-map
+- Sortable incident log with severity/type filters and search
+- Detail panel with properties, description, and mini-map flyTo
 
 ### Tab 3: Transport Status
-- Disrupted Lines table (filtered to disrupted only)
+- Disrupted Lines table with mode filters and search
 - Road Conditions table
 - Bus Arrivals table (sorted by ETA)
 
 ### Tab 4: Resources & Fleet
-- Crisis Resource CRUD (Create, Update, Delete actions)
+- Crisis Resource CRUD (Create with type dropdown + location selector, Update, Delete)
+- Resource type filter pills, Low Stock toggle, sortable quantity
 - Transport Unit fleet overview with vehicle type filter
 
 ### Tab 5: Analytics
-- Travel Time Matrix (hub → incident distances)
-- Journey Plans (public transport routing)
+- Travel Time Matrix with hub search and sort
+- Journey Plans with mode filter and sort
 - Metrics: Air Quality Band, Avg Travel Time, Routes Calculated
 - ⚡ **Incident Trends**: daily counts with 7-day rolling averages
 - ⚡ **Peak Disruption Hours**: hour × day-of-week heatmap
