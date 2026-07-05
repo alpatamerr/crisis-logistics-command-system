@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import ReactDOM from "react-dom/client";
-import { RouterProvider } from "react-router-dom";
+import { RouterProvider } from "react-router";
 import { OsdkProvider2 } from "@osdk/react/experimental";
 import client from "@/client";
 import ErrorBoundary from "@/components/ErrorBoundary";
