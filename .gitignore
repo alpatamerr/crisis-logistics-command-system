@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env.production
+.env.development
+.env.code-workspaces
+.env.local
+__pycache__/
+*.pyc
+.DS_Store
+*.egg-info/
+.gradle/
+.node-installation/
+.maestro/

@@ -1,0 +1,111 @@
+# 🚨 Crisis Logistics Command System
+
+A full-stack real-time crisis logistics platform for West London, built on **Palantir Foundry**. Combines live data pipelines, ontology functions, and a React operational dashboard.
+
+> ⚠️ **Note:** This system runs on [Palantir Foundry](https://www.palantir.com/platforms/foundry/) and requires a Foundry instance with the configured Ontology. Source code is provided for portfolio/review purposes.
+
+## 📁 Repository Structure
+
+| Directory | Stack | Description |
+|-----------|-------|-------------|
+| [`frontend/`](./frontend) | React 19, TypeScript, OSDK, Leaflet, BlueprintJS | Operational dashboard with 5 tabs, interactive map, filters, and CRUD actions |
+| [`pipelines/`](./pipelines) | Python, PySpark, Foundry Transforms, REST APIs | Data ingestion from TfL API, Google Maps, Air Quality API |
+| [`functions/`](./functions) | TypeScript v2, Foundry Functions | Server-side business logic and ontology edit functions |
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TB
+    subgraph APIs["🌐 External APIs"]
+        direction LR
+        TfL["TfL Unified API"] ~~~ Google["Google Maps Platform"] ~~~ AQ["Air Quality API"]
+    end
+
+    DC["📡 Data Connection"]
+
+    subgraph Pipelines["📊 Pipelines — Python/PySpark"]
+        direction LR
+        P1["Incident\nProcessor"] ~~~ P2["Transport\nProcessors"] ~~~ P3["Location\nDiscovery"] ~~~ P4["Travel Time\nMatrix"]
+    end
+
+    subgraph Ontology["🗄️ Ontology — 10 Object Types"]
+        direction LR
+        O1["LiveIncident\nLiveLocation\nLiveTransportUnit"] ~~~ O2["LineStatus\nRoadStatus\nBusArrival"] ~~~ O3["TravelTime\nJourneyPlan\nAirQuality\nCrisisResource"]
+    end
+
+    subgraph Functions["⚙️ TypeScript v2 Functions"]
+        F1["Action Logic · Business Rules"]
+    end
+
+    subgraph App["🖥️ React Frontend — OSDK · Leaflet · BlueprintJS"]
+        direction LR
+        UI["5-Tab Dashboard"] ~~~ Map["Interactive Map"] ~~~ Actions["CRUD Actions"]
+    end
+
+    APIs --> DC
+    DC --> Pipelines
+    Pipelines --> Ontology
+    Ontology --> App
+    Functions <--> Ontology
+    Actions --> Functions
+```
+
+
+
+## 📊 Data Pipeline (`pipelines/`)
+
+15 Python transforms pulling live data from external APIs:
+
+| Transform | Source | Output |
+|-----------|--------|--------|
+| `tfl_incident_processor` | TfL Unified API | LiveIncident objects |
+| `tfl_line_status_processor` | TfL API | LineStatus objects |
+| `tfl_road_status_processor` | TfL API | RoadStatus objects |
+| `tfl_bus_arrivals_processor` | TfL API | BusArrival objects |
+| `tfl_journey_planner_processor` | TfL API | JourneyPlan objects |
+| `tfl_air_quality_processor` | TfL API | AirQuality objects |
+| `infrastructure_discovery` | Google Maps Places | LiveLocation objects |
+| `travel_time_matrix` | Google Distance Matrix | TravelTime objects |
+| `route_directions` | Google Directions | Route data |
+| `unified_fleet` | TfL API | LiveTransportUnit objects |
+| `unified_locations` | Multiple sources | Consolidated locations |
+
+All API keys are stored securely in Foundry's secret vault — no hardcoded credentials.
+
+## 🖥️ Frontend (`frontend/`)
+
+React 19 operational dashboard with 5 tabs:
+
+1. **Situation Overview** — Interactive Leaflet map with severity markers, histogram filters, time range
+2. **Active Incidents** — Master-detail table with severity/type filters, mini-map flyTo
+3. **Transport Status** — Disrupted lines, road conditions, bus arrivals with mode filters
+4. **Resources & Fleet** — CRUD resource management via OSDK Actions, fleet monitoring
+5. **Analytics** — Travel times, journey plans, air quality metrics
+
+**Tech:** React 19 · TypeScript 5.5 · Vite 7 · BlueprintJS 6 · Leaflet · @osdk/react
+
+## ⚙️ Functions (`functions/`)
+
+TypeScript v2 Foundry Functions providing server-side logic for:
+- Ontology edit functions backing Action Types
+- Data validation and business rules
+
+## 🗄️ Ontology (10 Object Types)
+
+| Object Type | Description |
+|-------------|-------------|
+| LiveIncident | Road/transport incidents with severity and geolocation |
+| LiveLocation | Infrastructure points (hospitals, stations, police) |
+| LiveTransportUnit | Fleet vehicles with GPS positions |
+| LineStatus | Tube/rail/bus line disruption status |
+| RoadStatus | Major road conditions |
+| BusArrival | Real-time bus arrival predictions |
+| CrisisResource | Inventory items (medical kits, water, blankets) |
+| TravelTime | Travel times between hubs and incidents |
+| JourneyPlan | Multi-modal route plans |
+| AirQuality | Air quality forecasts |
+
+## 📝 License
+
+This project is proprietary and built on Palantir Foundry.
+```
