@@ -250,7 +250,7 @@ transforms-python/
 | Component | Technology |
 |-----------|-----------|
 | **Platform** | Palantir Foundry / React OSDK |
-| **Transforms** | Python 3.11+ / PySpark / Polars |
+| **Transforms** | Python 3.12+ / PySpark / Polars |
 | **Functions** | TypeScript V2 (`@osdk/functions`) |
 | **Application** | Foundry Workshop / React OSDK |
 | **Compute** | Lightweight (single-node) + PySpark (distributed, 2 executors) |
