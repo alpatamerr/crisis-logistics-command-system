@@ -1,4 +1,7 @@
-# Architecture
+# # Frontend Architecture — React OSDK Application
+
+> Technical architecture for the React 19 frontend built with Palantir OSDK, Leaflet, and BlueprintJS.
+
 
 ## System Overview
 
