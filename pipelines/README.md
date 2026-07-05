@@ -62,7 +62,7 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
 ├─────────────────────────────────────────────────────────────────────┤
 │  Live Incident │ Location │ Transport Unit │ Line Status │ Road     │
 │  Bus Arrival   │ Crisis Resource │ Travel Time │ Journey Plan │ Air │
-│  ⚡ IncidentTrend │ ⚡ PeakHourHeatmap │ ⚡ TransportHotspot        │
+│  ⚡ IncidentTrend │ ⚡ PeakHourHeatmap │ ⚡ TransportHotspot           │
 └─────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -71,7 +71,7 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
 ├─────────────────────────────────────────────────────────────────────┤
 │  Tab 1: Situation Map    │  Tab 2: Active Incidents                 │
 │  Tab 3: Transport Status │  Tab 4: Resources & Fleet                │
-│  Tab 5: Analytics + ⚡ PySpark Trends/Heatmap/Hotspots              │
+│  Tab 5: Analytics + ⚡ PySpark Trends/Heatmap/Hotspots               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
