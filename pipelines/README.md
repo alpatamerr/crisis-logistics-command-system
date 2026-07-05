@@ -265,4 +265,4 @@ Data sources: **TfL Open Data** (Contains OS data © Crown copyright and databas
 
 ## License
 
-Proprietary — built for demonstration purposes.
+Proprietary, built for demonstration purposes.
