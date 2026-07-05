@@ -14,7 +14,13 @@ A full-stack real-time crisis logistics platform for West London, built on **Pal
 
 ## 🎥 Demo
 
-[![Watch Demo](https://youtu.be/yjSYnmHwk6U)
+<div align="center">
+  <a href="https://youtu.be/yjSYnmHwk6U">
+    <img src="https://img.youtube.com/vi/yjSYnmHwk6U/maxresdefault.jpg" alt="Demo Video" width="600">
+    <br>
+    <img src="https://img.shields.io/badge/▶_Play_Demo-YouTube-red?style=for-the-badge&logo=youtube">
+  </a>
+</div>
 
 ## 🏗️ Architecture
 
