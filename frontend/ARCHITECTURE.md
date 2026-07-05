@@ -1,7 +1,6 @@
-# # Frontend Architecture — React OSDK Application
+# Frontend Architecture — React OSDK Application
 
 > Technical architecture for the React 19 frontend built with Palantir OSDK, Leaflet, and BlueprintJS.
-
 
 ## System Overview
 
@@ -20,12 +19,12 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     PALANTIR FOUNDRY PLATFORM                       │
 ├─────────────────────────────────────────────────────────────────────┤
-│  ┌───────────────┐    ┌───────────────┐    ┌───────────────┐        │
-│  │  Data         │    │  Python       │    │  Ontology     │        │
-│  │  Connection   │───▶│  Transforms   │───▶│  (10 Object   │        │
-│  │  (TfL Sync)   │    │  (Clean/      │    │   Types)      │        │
-│  │               │    │   Enrich)     │    │               │        │
-│  └───────────────┘    └───────────────┘    └───────┬───────┘        │ 
+│  ┌───────────────┐    ┌───────────────┐    ┌───────────────┐       │
+│  │  Data         │    │  Python       │    │  Ontology     │       │
+│  │  Connection   │───▶│  Transforms   │───▶│  (13 Object   │       │
+│  │  (TfL Sync)   │    │  + PySpark    │    │   Types)      │       │
+│  │               │    │  Analytics    │    │               │       │
+│  └───────────────┘    └───────────────┘    └───────┬───────┘       │
 │                                                     │               │
 │  ┌───────────────┐                                  │               │
 │  │  TypeScript   │◀─────────────────────────────────┘               │
@@ -40,10 +39,10 @@
 │                     REACT APPLICATION (This Repo)                   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  ┌──────────┐   ┌──────────────┐   ┌──────────────────────┐         │
-│  │  OAuth   │   │  OsdkProvider│   │  React Router        │         │
-│  │  Client  │──▶│  (Context)   │──▶│  (/ + /auth/callback)│         │
-│  └──────────┘   └──────────────┘   └──────────┬───────────┘         │
+│  ┌──────────┐   ┌──────────────┐   ┌──────────────────────┐        │
+│  │  OAuth   │   │  OsdkProvider│   │  React Router        │        │
+│  │  Client  │──▶│  (Context)   │──▶│  (/ + /auth/callback)│        │
+│  └──────────┘   └──────────────┘   └──────────┬───────────┘        │
 │                                                 │                   │
 │                                    ┌────────────▼────────────┐      │
 │                                    │       Home.tsx          │      │
@@ -52,19 +51,19 @@
 │                                                 │                   │
 │       ┌──────────┬──────────┬──────────┬────────┴───────┐           │
 │       ▼          ▼          ▼          ▼                ▼           │
-│  ┌─────────┐┌─────────┐┌─────────┐┌─────────┐  ┌──────────┐         │
-│  │Dashboard││ Active  ││Transport││Resources│  │Analytics │         │
-│  │         ││Incidents││ Status  ││ & Fleet │  │          │         │
-│  │Map+Hist ││Table+   ││Lines+   ││CRUD+    │  │Tables+   │         │
-│  │+Metrics ││Detail   ││Roads+   ││Fleet    │  │Metrics   │         │
-│  └─────────┘└─────────┘│Buses    │└─────────┘  └──────────┘         │
+│  ┌─────────┐┌─────────┐┌─────────┐┌─────────┐  ┌──────────┐       │
+│  │Dashboard││ Active  ││Transport││Resources│  │Analytics │       │
+│  │         ││Incidents││ Status  ││ & Fleet │  │+ PySpark │       │
+│  │Map+Hist ││Table+   ││Lines+   ││CRUD+    │  │Trends+   │       │
+│  │+Metrics ││Detail   ││Roads+   ││Fleet    │  │Hotspots  │       │
+│  └─────────┘└─────────┘│Buses    │└─────────┘  └──────────┘       │
 │                        └─────────┘                                  │
 │                                                                     │
 │  Shared Components:                                                 │
-│  ┌──────────────────┐  ┌────────────┐  ┌──────────────┐             │
-│  │   CrisisMap      │  │   Error    │  │   Loading    │             │
-│  │   (Leaflet)      │  │  Boundary  │  │   Spinner    │             │
-│  └──────────────────┘  └────────────┘  └──────────────┘             │
+│  ┌──────────────────┐  ┌────────────┐  ┌──────────────┐            │
+│  │   CrisisMap      │  │   Error    │  │   Loading    │            │
+│  │   (Leaflet)      │  │  Boundary  │  │   Spinner    │            │
+│  └──────────────────┘  └────────────┘  └──────────────┘            │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -77,6 +76,7 @@
 4. Data is filtered/sorted client-side based on user interactions
 5. Actions (create/update/delete) use useOsdkAction() → writes back to Ontology
 6. Ontology syncs changes back to backing datasets
+7. PySpark analytics (trends, heatmap, hotspots) computed server-side, fetched via OSDK
 ```
 
 ## Component Architecture
@@ -130,6 +130,16 @@ Three actions are implemented:
 2. **Update** — dialog pre-filled with current values, submits delta
 3. **Delete** — confirmation then delete
 
+### PySpark Analytics (Tab 5)
+
+Three server-side computed analytics consumed via OSDK:
+
+| Section | Object Type | PySpark Features |
+|---------|-------------|-----------------|
+| Incident Trends | `IncidentTrend` | `Window.rangeBetween`, rolling avg, `groupBy` |
+| Peak Hours | `PeakHourHeatmap` | `.pivot()`, `dayofweek()`, cross-tab |
+| Hotspots | `TransportHotspot` | `row_number()`, severity weighting, spatial grid |
+
 ## Security Considerations
 
 - **OAuth 2.0** with PKCE flow (public client, no client secret)
@@ -141,6 +151,7 @@ Three actions are implemented:
 
 | Optimization | Implementation |
 |-------------|----------------|
+| Vite 8 + Rolldown | Rust-based bundler, ~430ms production builds |
 | Lazy loading | Map component loaded via `React.lazy()` |
 | Memoization | `useMemo` for filtered/sorted data, histogram computations |
 | Tab rendering | `renderActiveTabPanelOnly={true}` — only active tab renders |
