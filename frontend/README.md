@@ -1,6 +1,8 @@
 # 🚨 Crisis Logistics Command Center
 
-A real-time operational dashboard for monitoring and managing crisis logistics across London, built with **React 19**, **Palantir's Ontology SDK (OSDK)**, and **Leaflet maps**.
+A real-time operational dashboard for monitoring and managing crisis logistics across West London, built with **React 19**, **Palantir's Ontology SDK (OSDK)**, and **Leaflet maps**.
+
+> 📂 This is the **React frontend**. See the [root README](../README.md) for full system overview and the [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed technical design.
 
 ![React](https://img.shields.io/badge/React-19-blue) ![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue) ![Vite](https://img.shields.io/badge/Vite-7-purple) ![Blueprint](https://img.shields.io/badge/BlueprintJS-6-green)
 
