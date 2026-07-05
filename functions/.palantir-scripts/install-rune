@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+
+# DO NOT MODIFY OR DELETE THIS FILE.
+#
+# ANY CHANGES MAY RESULT IN SERIOUS DAMAGE
+# TO THE TECHNICAL INFRASTRUCTURE AND LOSS OF DATA!
+
+#
+# (c) Copyright 2026 Palantir Technologies Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+set -euo pipefail
+
+root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+output="${root_dir}/rune"
+
+version="0.30.0"
+if [[ -z "${version}" || "${version}" == *@* ]]; then
+    echo "rune version placeholder was not substituted at build time" >&2
+    exit 1
+fi
+
+# Detect platform ---------------------
+case "$(uname -s)" in
+    Darwin) os=darwin ;;
+    Linux)  os=linux  ;;
+    *) echo "Unsupported OS: $(uname -s)" >&2; exit 1 ;;
+esac
+case "$(uname -m)" in
+    arm64|aarch64)  arch=aarch64 ;;
+    x86_64|amd64)   arch=x86_64  ;;
+    *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+readonly platform_dir="${os}-${arch}"
+
+# Bootstrap auth and service discovery -----------------------------
+if [[ "${FOUNDRY_CONTAINER_RUNTIME_TYPE:-}" == "CODE_WORKSPACE" ]]; then
+    bearer_token="$(cat "${FOUNDRY_SCOPED_TOKEN}")"
+    artifacts_api_uri="$(yq -r '.artifacts[0]' < "${FOUNDRY_SERVICE_DISCOVERY_V2}")"
+elif [[ -n "${FOUNDRY_HOSTNAME:-}" && -n "${FOUNDRY_TOKEN:-}" ]]; then
+    bearer_token="${FOUNDRY_TOKEN}"
+    artifacts_api_uri="https://${FOUNDRY_HOSTNAME}/artifacts/api"
+else
+    git_remote="$(git -C "${root_dir}" config remote.origin.url)"
+    if [[ "${git_remote}" != https://*:*@* ]]; then
+        echo "Could not locate Foundry credentials." >&2
+        echo "Set FOUNDRY_TOKEN and FOUNDRY_HOSTNAME, or run inside the Foundry platform." >&2
+        exit 1
+    fi
+    userinfo="${git_remote#*//}"; userinfo="${userinfo%%@*}"
+    bearer_token="${userinfo#*:}"
+    host_and_path="${git_remote#*@}"
+    host="${host_and_path%%/*}"
+    artifacts_api_uri="https://${host}/artifacts/api"
+fi
+readonly bearer_token artifacts_api_uri
+
+# Check if the desired version is already installed ----------------
+if [[ -x "${output}" ]]; then
+    if installed_version="$("${output}" --version 2>/dev/null)" \
+        && [[ "${installed_version}" == "rune ${version}" ]]; then
+        echo "rune ${version} already installed"
+        exit 0
+    fi
+fi
+
+repo_rid="$(awk -F= '/^[[:space:]]*repositoryRid[[:space:]]*=/ {gsub(/[[:space:]]/,"",$2); print $2}' \
+    "${root_dir}/gradle.properties")"
+if [[ -z "${repo_rid}" || "${repo_rid}" == "{{REPOSITORY_RID}}" ]]; then
+    git_remote="$(git -C "${root_dir}" remote get-url origin)"
+    if [[ "${git_remote}" =~ (ri\.stemma\.main\.repository\.[a-zA-Z0-9._-]+) ]]; then
+        repo_rid="${BASH_REMATCH[1]}"
+    else
+        echo "Could not determine repositoryRid: not set in gradle.properties and no ri.stemma.main.repository.* found in git remote (${git_remote})" >&2
+        exit 1
+    fi
+fi
+readonly repo_rid
+
+# Download tarball, find entry by suffix, extract --------------------
+locator="com/palantir/functions/functions-rune/${version}/functions-rune-${version}.sls.tgz"
+url="${artifacts_api_uri}/repositories/${repo_rid}/contents/release/maven/${locator}"
+
+echo "Downloading rune ${version} for ${platform_dir}"
+
+curl_args=(
+    --silent --show-error --fail --location
+    --retry 3 --retry-connrefused
+    --header "@-"
+)
+if [[ -n "${FOUNDRY_CA_BUNDLE:-}" ]]; then
+    curl_args+=(--cacert "${FOUNDRY_CA_BUNDLE}")
+fi
+
+tmp_tgz="$(mktemp "${TMPDIR:-/tmp}/rune-XXXXXX")"
+trap 'rm -f "${tmp_tgz}"' EXIT INT TERM
+
+# Pass the Authorization header via stdin (`--header "@-"`) to keep the bearer
+# token out of process listings (`ps`/`/proc/<pid>/cmdline`).
+printf 'Authorization: Bearer %s\n' "${bearer_token}" \
+    | curl "${curl_args[@]}" -o "${tmp_tgz}" "${url}"
+
+suffix="/service/bin/${platform_dir}/rune"
+entry="$(tar -tzf "${tmp_tgz}" | grep -E -- "${suffix//./\\.}$" | head -n1 || true)"
+
+if [[ -z "${entry}" ]]; then
+    echo "Could not find an entry ending in ${suffix} inside ${locator}" >&2
+    echo "Tarball contents:" >&2
+    tar -tzf "${tmp_tgz}" | head -n20 >&2
+    exit 1
+fi
+
+rm -f "${output}"
+tar -xzf "${tmp_tgz}" -O "${entry}" > "${output}"
+
+if [[ ! -s "${output}" ]]; then
+    echo "Extracted file is empty" >&2
+    rm -f "${output}"
+    exit 1
+fi
+
+chmod 0755 "${output}"
+echo "Extracted rune to ${output}"

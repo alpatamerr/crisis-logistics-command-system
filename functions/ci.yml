@@ -1,0 +1,86 @@
+# DO NOT MODIFY THIS FILE
+env:
+  gradleDistributionUrl:
+    uri-role: gradle-distribution-7-6-4
+  ORG_GRADLE_PROJECT_condaInstallerUri:
+    uri-role: conda-installer
+  ORG_GRADLE_PROJECT_mambaInstaller8:
+    uri-role: mamba-installer8
+  ORG_GRADLE_PROJECT_functionRegistryApiUri:
+    uri-role: function-registry-api
+  ORG_GRADLE_PROJECT_functionExecutorApiUri:
+    uri-role: function-executor-api
+  ORG_GRADLE_PROJECT_ontologyMetadataApiUri:
+    uri-role: ontology-metadata-api
+  ORG_GRADLE_PROJECT_actionsApiUri:
+    uri-role: actions-api
+  ORG_GRADLE_PROJECT_artifactsApiUri:
+    uri-role: foundry-artifacts-api
+  ORG_GRADLE_PROJECT_artifactsDockerRegistry:
+    uri-role: foundry-artifacts-docker-registry
+  ORG_GRADLE_PROJECT_opusServerApiUri:
+    uri-role: opus-server-api
+  ORG_GRADLE_PROJECT_foundryMlApiUri:
+    uri-role: foundry-ml-api
+  ORG_GRADLE_PROJECT_foundryMlLiveApiUri:
+    uri-role: foundry-ml-live-api
+  ORG_GRADLE_PROJECT_modelsApiUri:
+    uri-role: models-api
+  ORG_GRADLE_PROJECT_bellasoApiUri:
+    uri-role: bellaso-api
+  ORG_GRADLE_PROJECT_webhooksApiUri:
+    uri-role: webhooks-api
+  ORG_GRADLE_PROJECT_magritteCoordinatorApiUri:
+    uri-role: magritte-coordinator-api
+  ORG_GRADLE_PROJECT_languageModelServiceApiUri:
+    uri-role: language-model-service-api
+  ORG_GRADLE_PROJECT_corditeApiUri:
+    uri-role: cordite-api
+  ORG_GRADLE_PROJECT_apiGateway:
+    uri-role: api-gateway
+  ORG_GRADLE_PROJECT_thirdPartyApplicationServiceApiUri:
+    uri-role: third-party-application-service-api
+  ORG_GRADLE_PROJECT_foundryTelemetryServiceApiUri:
+    uri-role: foundry-telemetry-service-api
+
+required-job-token-capabilities:
+  - functions
+
+java-version: JAVA_17
+
+jobs:
+  functions-publish:
+    timeout: 20 minutes
+    steps:
+      - |
+        set -euo pipefail
+        
+        [[ -n "${JAVA_HOME-}" && -d "$JAVA_HOME" ]] || {
+            echo "JAVA_HOME was not set or did not point to a valid directory."
+            exit 1
+        }
+        
+        if [ ! -z "${JEMMA_TAG:-}" ]; then
+          export ORG_GRADLE_PROJECT_jemmaTag="${JEMMA_TAG}"
+        fi
+
+        if [ ! -z "${JEMMA_FOUNDRY_BRANCH:-}" ]; then
+          export ORG_GRADLE_PROJECT_jemmaFoundryBranchRid="${JEMMA_FOUNDRY_BRANCH}"
+        fi
+
+        if [[ "$ORG_GRADLE_PROJECT_corditeApiUri" == "https://ci-role-not-found"* ]]; then
+          echo "Disabling full Node.js runtime because Cordite API URIs could not be found."
+          unset ORG_GRADLE_PROJECT_corditeApiUri
+        fi
+        
+        export JAVA_OPTS="-Xmx512m -Djavax.net.ssl.trustStore=${STEMMA_DEFAULT_TRUST_STORE_PATH} -Djavax.net.ssl.trustStorePassword=${STEMMA_DEFAULT_TRUST_STORE_PASSWORD}"
+        export GRADLE_OPTS="-Dgradle.wrapperUser='' -Dgradle.wrapperPassword=${JOB_TOKEN}"
+        export ORG_GRADLE_PROJECT_trustStore="${STEMMA_DEFAULT_TRUST_STORE_PATH}"
+        export ORG_GRADLE_PROJECT_bearerToken="${JOB_TOKEN}"
+        export ORG_GRADLE_PROJECT_repoRid="${STEMMA_REPO_RID}"
+        export ORG_GRADLE_PROJECT_isRunningInJemma="${JEMMA}"
+        export ORG_GRADLE_PROJECT_testReportsDir="${JEMMA_TEST_REPORTS}"
+        
+        unset `printenv | grep "^npm_config.*=" | cut -d= -f1`
+        
+        ./gradlew patch check publish --no-daemon --build-cache
