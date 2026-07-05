@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback } from "react";
 import {
   Card, Tag, Intent, Spinner, HTMLTable, Button, Callout, Icon,
-  InputGroup, NumericInput, Dialog, DialogBody, DialogFooter, FormGroup, Switch
+  NumericInput, Dialog, DialogBody, DialogFooter, FormGroup, Switch, HTMLSelect
 } from "@blueprintjs/core";
 import { useOsdkObjects, useOsdkAction } from "@osdk/react/experimental";
-import { CrisisResource, LiveTransportUnit, $Actions } from "@crisis-logistics-command-app/sdk";
+import { CrisisResource, LiveTransportUnit, LiveLocation, $Actions } from "@crisis-logistics-command-app/sdk";
 
 type SortDir = "asc" | "desc";
 const FLEET_PAGE_SIZE = 50;
@@ -13,8 +13,9 @@ export default function ResourcesFleet() {
   // ─── Resources State ───
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newResourceType, setNewResourceType] = useState("");
-  const [newQuantity, setNewQuantity] = useState(0);
-  const [newThreshold, setNewThreshold] = useState(0);
+  const [newQuantity, setNewQuantity] = useState(1);
+  const [newThreshold, setNewThreshold] = useState(10);
+  const [newLocationId, setNewLocationId] = useState("");
 
   // Update dialog
   const [updateTarget, setUpdateTarget] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export default function ResourcesFleet() {
   // ─── Data Fetching ───
   const resources = useOsdkObjects(CrisisResource, { pageSize: 100 });
   const units = useOsdkObjects(LiveTransportUnit, { pageSize: 200 });
+  const locations = useOsdkObjects(LiveLocation, { pageSize: 100 });
 
   // ─── Actions ───
   const createAction = useOsdkAction($Actions.createCrisisResource);
@@ -91,25 +93,32 @@ export default function ResourcesFleet() {
 
   // ─── Handlers ───
   const handleCreate = useCallback(async () => {
-    if (!newResourceType || newQuantity <= 0) {
+    if (!newResourceType || !newLocationId || newQuantity < 1) {
       return;
     }
+    const selectedLocation = newLocationId
+      ? (locations.data ?? []).find(l => l.locationId === newLocationId)
+      : undefined;
     try {
-      await createAction.applyAction({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const params: any = {
         "resource-type": newResourceType,
         "quantity": newQuantity,
         "critical-threshold": newThreshold > 0 ? newThreshold : null,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        "location-id": undefined as any,
-      });
+      };
+      if (selectedLocation) {
+        params["location-id"] = selectedLocation;
+      }
+      await createAction.applyAction(params);
       setNewResourceType("");
-      setNewQuantity(0);
-      setNewThreshold(0);
+      setNewQuantity(1);
+      setNewThreshold(10);
+      setNewLocationId("");
       setShowCreateForm(false);
     } catch {
       // error handled by hook
     }
-  }, [createAction, newResourceType, newQuantity, newThreshold]);
+  }, [createAction, newResourceType, newQuantity, newThreshold, newLocationId, locations.data]);
 
   const handleDelete = useCallback(async (res: CrisisResource.OsdkInstance) => {
     try {
@@ -197,19 +206,40 @@ export default function ResourcesFleet() {
         {showCreateForm && (
           <div className="inline-form">
             <FormGroup label="Type" inline={false} style={{ margin: 0 }}>
-              <InputGroup
-                placeholder="e.g. Medical Kit"
+              <HTMLSelect
                 value={newResourceType}
                 onChange={(e) => setNewResourceType(e.target.value)}
-                small
-                style={{ width: 160 }}
-              />
+                style={{ width: 180 }}
+              >
+                <option value="">Select type...</option>
+                <option value="FOOD_RATIONS">Food Rations</option>
+                <option value="POTABLE_WATER">Potable Water</option>
+                <option value="MEDICAL_KITS">Medical Kits</option>
+                <option value="FUEL">Fuel</option>
+                <option value="BLANKETS">Blankets</option>
+                <option value="SHELTER_EQUIPMENT">Shelter Equipment</option>
+              </HTMLSelect>
+            </FormGroup>
+            <FormGroup label="Location" inline={false} style={{ margin: 0 }}>
+              <HTMLSelect
+                value={newLocationId}
+                onChange={(e) => setNewLocationId(e.target.value)}
+                style={{ width: 180 }}
+              >
+                <option value="">Select location...</option>
+                {(locations.data ?? []).map(loc => (
+                  <option key={loc.locationId} value={loc.locationId}>
+                    {loc.locationName ?? loc.locationId}
+                  </option>
+                ))}
+              </HTMLSelect>
             </FormGroup>
             <FormGroup label="Quantity" inline={false} style={{ margin: 0 }}>
               <NumericInput
                 value={newQuantity}
                 onValueChange={(v) => setNewQuantity(v)}
-                min={0}
+                min={1}
+                placeholder="Min: 1"
                 small
                 style={{ width: 90 }}
               />
@@ -230,7 +260,7 @@ export default function ResourcesFleet() {
               small
               onClick={handleCreate}
               loading={createAction.isPending}
-              disabled={!newResourceType || newQuantity <= 0}
+              disabled={!newResourceType || !newLocationId || newQuantity < 1}
             />
           </div>
         )}
