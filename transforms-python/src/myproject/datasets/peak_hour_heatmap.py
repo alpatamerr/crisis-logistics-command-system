@@ -61,6 +61,10 @@ def compute(raw_incidents):
         heatmap
         .join(pivoted, on=["hour_of_day", "day_of_week", "day_name"], how="left")
         .withColumn("analysis_generated_at", F.current_timestamp())
+        .withColumn(
+            "heatmap_id",
+            F.concat_ws("_", F.col("day_of_week").cast("string"), F.col("hour_of_day").cast("string"))
+        )
         .orderBy("day_of_week", "hour_of_day")
     )
 

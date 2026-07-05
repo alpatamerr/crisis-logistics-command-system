@@ -63,6 +63,10 @@ def compute(raw_incidents):
         daily_with_rolling
         .join(daily_total, on="incident_date", how="left")
         .withColumn("analysis_generated_at", F.current_timestamp())
+        .withColumn(
+            "trend_id",
+            F.concat_ws("_", F.col("incident_date").cast("string"), F.col("severity_level"))
+        )
         .orderBy("incident_date", "severity_level")
     )
 
