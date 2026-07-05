@@ -26,7 +26,7 @@ The Crisis Logistics Command Center provides real-time situational awareness for
 | **UI Components** | BlueprintJS 6 (Palantir's design system) |
 | **Data Layer** | Palantir OSDK (`@osdk/react` experimental hooks) |
 | **Maps** | Leaflet + react-leaflet 5 (CartoDB Voyager tiles) |
-| **Routing** | react-router-dom 6 |
+| **Routing** | React Router 8 |
 | **Auth** | OAuth 2.0 via `@osdk/oauth` |
 | **Hosting** | Palantir Foundry Website Hosting |
 
