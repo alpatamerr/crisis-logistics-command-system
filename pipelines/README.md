@@ -302,5 +302,3 @@ All API keys are retrieved at runtime via `source.get_secret()` from Foundry's s
 ## License
 
 Proprietary, built for demonstration purposes.
-
----
