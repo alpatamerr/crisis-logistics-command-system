@@ -122,7 +122,3 @@ TypeScript v2 Foundry Functions providing server-side logic for:
 ## 📝 License
 
 Proprietary, built for demonstration purposes.
-
----
-
-Yapıştırdın mı? Sonraki: `frontend/README.md`
