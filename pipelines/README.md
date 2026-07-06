@@ -125,6 +125,7 @@ Three distributed analytics transforms using Apache Spark (Window functions, piv
 | `transport_reliability` | `F.row_number()`, `F.coalesce()`, severity weighting, spatial grid | Geographic hotspot ranking by severity-weighted score |
 
 **Why PySpark?** 
+
 Historical incident data accumulates over time (incremental ingestion). As weeks/months of data build up, these analytics require distributed compute for:
 - Window functions over large time ranges (rolling averages)
 - Cross-tab pivots on high-cardinality dimensions (hour × day × severity)
