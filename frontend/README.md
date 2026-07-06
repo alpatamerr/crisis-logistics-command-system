@@ -192,4 +192,4 @@ https://*.basemaps.cartocdn.com
 
 ## 📝 License
 
-Proprietary, built for demonstration purposes.
+Proprietary, built for a private client; shared here for portfolio/demonstration purposes.
