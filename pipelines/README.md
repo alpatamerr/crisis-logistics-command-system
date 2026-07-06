@@ -71,7 +71,7 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
 ├─────────────────────────────────────────────────────────────────────┤
 │  Tab 1: Situation Map    │  Tab 2: Active Incidents                 │
 │  Tab 3: Transport Status │  Tab 4: Resources & Fleet                │
-│  Tab 5: Analytics + ⚡ PySpark Trends/Heatmap/Hotspots               │
+│  Tab 5: Analytics + ⚡ PySpark Trends/Heatmap/Hotspots/Anomalies     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -116,13 +116,15 @@ Longitude: -0.51 — -0.17
 
 ## ⚡ PySpark Analytics
 
-Three distributed analytics transforms using Apache Spark (Window functions, pivots, aggregations):
+Four distributed analytics transforms using Apache Spark (Window functions, pivots, aggregations):
 
 | Transform | PySpark Features | Output |
 |-----------|-----------------|--------|
 | `incident_trend_analysis` | `Window.rangeBetween`, `F.avg().over()`, `groupBy().agg()` | Daily incident counts + 7-day rolling avg by severity |
 | `peak_hour_heatmap` | `.pivot()`, `F.hour()`, `F.dayofweek()`, cross-tab aggregation | Hour × day-of-week disruption frequency matrix |
 | `transport_reliability` | `F.row_number()`, `F.coalesce()`, severity weighting, spatial grid | Geographic hotspot ranking by severity-weighted score |
+| `anomaly_detection` | `Window.rowsBetween`, `F.stddev()`, Z-score, threshold classification | Daily anomaly flags (SPIKE/DROP/NORMAL) |
+
 
 **Why PySpark?** 
 
@@ -130,8 +132,35 @@ Historical incident data accumulates over time (incremental ingestion). As weeks
 - Window functions over large time ranges (rolling averages)
 - Cross-tab pivots on high-cardinality dimensions (hour × day × severity)
 - Spatial aggregation across thousands of grid cells
+- Statistical anomaly detection (Z-score over 14-day windows)
 
 ---
+
+## 🧪 Unit Tests
+
+```bash
+pytest transforms-python/src/test/test_transforms.py
+```
+
+| Test Class | Coverage |
+|------------|----------|
+| TestGeohash | Geohash computation, precision, null handling |
+| TestBoundingBox | West London boundary validation |
+| TestHelicopterDetection | ICAO code classification |
+| TestAnomalyDetection | Z-score SPIKE/DROP/NORMAL classification |
+| TestSeverityScoring | Severity weight ordering |
+
+## ✅ Data Expectations
+Production data quality checks on key transforms:
+
+| Transform	| Check	| On Error
+|------------|------|------------|
+|current_incidents |	Primary key uniqueness (incident_id) |	FAIL |
+|current_incidents |	latitude not null |	WARN |
+|current_incidents |	longitude not null | WARN |
+|current_incidents |	severity_level not null |	WARN |
+
+
 
 ## React OSDK / Workshop Application (5 Tabs)
 
@@ -212,7 +241,7 @@ When Airlabs returns a flight with `aircraft_icao` matching a helicopter code, i
 | **Real-Time West London Feeds** | Every 15 min | incidents, line status, road status, bikepoints, raw incidents |
 | **Transport Tracking** | Every 15 min | bus arrivals, vehicle positions |
 | **Analytics Feeds** | Hourly | journey plans, air quality, travel time matrix |
-| **⚡ PySpark Analytics** | Daily | incident trends, peak hour heatmap, transport hotspots |
+| **⚡ PySpark Analytics** | Daily | incident trends, peak hour heatmap, transport hotspots, anomaly detection |
 
 ---
 
@@ -237,12 +266,16 @@ transforms-python/
 │   ├── infrastructure_discovery.py   # Nearby infrastructure
 │   ├── unified_fleet.py              # Fleet aggregation
 │   ├── unified_locations.py          # Location aggregation
-│   ├── current_incidents.py          # Incident deduplication
+│   ├── current_incidents.py          # Incident deduplication + data expectations
 │   ├── ⚡ incident_trend_analysis.py  # PySpark: daily trends + rolling avg
 │   ├── ⚡ peak_hour_heatmap.py        # PySpark: hour × day cross-tab
-│   └── ⚡ transport_reliability.py    # PySpark: hotspot detection
+│   ├── ⚡ transport_reliability.py    # PySpark: hotspot detection
+│   └── ⚡ anomaly_detection.py        # PySpark: Z-score anomaly detection
+├── src/test/
+│   └── test_transforms.py            # Unit tests (pytest)
 ├── conda_recipe/meta.yaml            # Dependencies
 └── README.md
+
 ```
 
 ---
@@ -258,6 +291,7 @@ transforms-python/
 | **Compute** | Lightweight (single-node) + PySpark (distributed, 2 executors) |
 | **External APIs** | TfL, Google Maps, Airlabs |
 | **Scheduling** | Foundry Scheduler (cron-based) |
+| **Testing** | pytest |
 
 ---
 
