@@ -59,7 +59,7 @@ flowchart TB
 
 ## 📊 Data Pipeline (`pipelines/`)
 
-20 Python transforms — 17 data ingestion + 3 PySpark analytics:
+21 Python transforms — 17 data ingestion + 4 PySpark analytics:
 
 | Transform | Source | Output |
 |-----------|--------|--------|
