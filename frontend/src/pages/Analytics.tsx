@@ -1,9 +1,89 @@
 import { useMemo, useState } from "react";
 import { Card, Spinner, HTMLTable, Tag, Intent, Callout, Icon, InputGroup, Button } from "@blueprintjs/core";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useOsdkObjects } from "@osdk/react/experimental";
-import { TravelTime, JourneyPlan, AirQuality, IncidentTrend, PeakHourHeatmap, TransportHotspot } from "@crisis-logistics-command-app/sdk";
+import { TravelTime, JourneyPlan, AirQuality, IncidentTrend, PeakHourHeatmap, TransportHotspot, LiveLocation } from "@crisis-logistics-command-app/sdk";
 
 type SortDir = "asc" | "desc";
+const PAGE_SIZE = 25;
+
+// ─── Loading Skeleton ───
+function Skeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <div style={{ padding: 16 }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+          {Array.from({ length: cols }).map((_, j) => (
+            <div
+              key={j}
+              style={{
+                height: 14,
+                flex: 1,
+                borderRadius: 4,
+                background: "linear-gradient(90deg, #e1e8ed 25%, #f0f3f6 50%, #e1e8ed 75%)",
+                backgroundSize: "200% 100%",
+                animation: "shimmer 1.5s infinite",
+              }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const MODE_ICONS: Record<string, string> = {
+  walking: "🚶",
+  bus: "🚌",
+  tube: "🚇",
+  overground: "🚆",
+  dlr: "🚈",
+  "national-rail": "🚂",
+  cycle: "🚴",
+  river: "⛴️",
+  tram: "🚊",
+  coach: "🚍",
+};
+
+function findNearestLocation(lat: number | null | undefined, lng: number | null | undefined, locs: Array<{ latitude?: number | null; longitude?: number | null; locationName?: string | null }>): string {
+  if (lat == null || lng == null || locs.length === 0) {
+    return `${lat?.toFixed(2) ?? "?"}, ${lng?.toFixed(2) ?? "?"}`;
+  }
+  let nearest = locs[0];
+  let minDist = Infinity;
+  for (const loc of locs) {
+    if (loc.latitude == null || loc.longitude == null) {
+      continue;
+    }
+    const d = (loc.latitude - lat) ** 2 + (loc.longitude - lng) ** 2;
+    if (d < minDist) {
+      minDist = d;
+      nearest = loc;
+    }
+  }
+  return nearest.locationName ?? `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+}
+
+function formatLegsSummary(raw: string | null | undefined): string {
+  if (!raw) {
+    return "—";
+  }
+  return raw
+    .split(">")
+    .map(leg => {
+      const trimmed = leg.trim();
+      const match = trimmed.match(/^(\w[\w-]*)\((\d+)min\)$/);
+      if (match) {
+        const mode = match[1].toLowerCase();
+        const mins = match[2];
+        const icon = MODE_ICONS[mode] ?? "•";
+        const name = mode.charAt(0).toUpperCase() + mode.slice(1);
+        return `${icon} ${name} ${mins} min`;
+      }
+      return trimmed;
+    })
+    .join(" → ");
+}
 
 function MetricCard({ title, value, subtitle, intent, icon, loading }: {
   title: string;
@@ -32,6 +112,11 @@ export default function Analytics() {
   const [jpSort, setJpSort] = useState<SortDir>("asc");
   const [hubSearch, setHubSearch] = useState("");
   const [modeFilter, setModeFilter] = useState<string | null>(null);
+  const [ttVisible, setTtVisible] = useState(PAGE_SIZE);
+  const [jpVisible, setJpVisible] = useState(PAGE_SIZE);
+  const [trendsVisible, setTrendsVisible] = useState(10);
+  const [peakVisible, setPeakVisible] = useState(10);
+  const [hotspotsVisible, setHotspotsVisible] = useState(10);
 
   const travelTimes = useOsdkObjects(TravelTime, {
     orderBy: { travelTimeSeconds: "asc" },
@@ -42,6 +127,8 @@ export default function Analytics() {
     pageSize: 50,
   });
   const airQuality = useOsdkObjects(AirQuality, { pageSize: 10 });
+
+  const locations = useOsdkObjects(LiveLocation, { pageSize: 100 });
 
   // PySpark Analytics
   const incidentTrends = useOsdkObjects(IncidentTrend, { orderBy: { incidentDate: "desc" }, pageSize: 50 });
@@ -66,7 +153,6 @@ export default function Analytics() {
 
   const sortedTravelTimes = useMemo(() => {
     let data = [...(travelTimes.data ?? [])];
-    // Hub search filter
     if (hubSearch) {
       const term = hubSearch.toLowerCase();
       data = data.filter(tt => {
@@ -84,7 +170,6 @@ export default function Analytics() {
 
   const sortedJourneyPlans = useMemo(() => {
     let data = [...(journeyPlans.data ?? [])];
-    // Mode filter
     if (modeFilter) {
       data = data.filter(jp => {
         const modes = (jp.modesUsed ?? "").toLowerCase();
@@ -98,6 +183,39 @@ export default function Analytics() {
     });
     return data;
   }, [journeyPlans.data, jpSort, modeFilter]);
+
+  // Chart data: aggregate by date for line chart
+  const trendChartData = useMemo(() => {
+    const byDate = new Map<string, { date: string; total: number; severe: number; serious: number; moderate: number; minimal: number }>();
+    (incidentTrends.data ?? []).forEach(t => {
+      const d = String(t.incidentDate ?? "");
+      if (!d) {
+        return;
+      }
+      if (!byDate.has(d)) {
+        byDate.set(d, { date: d, total: 0, severe: 0, serious: 0, moderate: 0, minimal: 0 });
+      }
+      const entry = byDate.get(d)!;
+      const count = Number(t.incidentCount ?? 0);
+      entry.total += count;
+      const sev = (t.severityLevel ?? "").toLowerCase();
+      if (sev === "severe") { entry.severe += count; }
+      else if (sev === "serious") { entry.serious += count; }
+      else if (sev === "moderate") { entry.moderate += count; }
+      else { entry.minimal += count; }
+    });
+    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [incidentTrends.data]);
+
+  // Peak hours chart: top 15 by incident count
+  const peakChartData = useMemo(() => {
+    return (peakHours.data ?? [])
+      .slice(0, 15)
+      .map(ph => ({
+        label: `${ph.dayName?.slice(0, 3) ?? "?"} ${String(ph.hourOfDay ?? 0).padStart(2, "0")}:00`,
+        incidents: Number(ph.incidentCount ?? 0),
+      }));
+  }, [peakHours.data]);
 
   const hasError = travelTimes.error || journeyPlans.error || airQuality.error;
   const currentAQ = (airQuality.data ?? []).find(aq => aq.forecastType === "Current");
@@ -173,7 +291,7 @@ export default function Analytics() {
       </div>
       <Card className="panel-card" style={{ marginBottom: 20 }}>
         {travelTimes.isLoading && !travelTimes.data && (
-          <div style={{ padding: 24, textAlign: "center" }}><Spinner /></div>
+          <Skeleton />
         )}
         {(travelTimes.data ?? []).length === 0 && !travelTimes.isLoading && (
           <div className="empty-state">
@@ -197,7 +315,7 @@ export default function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {sortedTravelTimes.map((tt) => (
+              {sortedTravelTimes.slice(0, ttVisible).map((tt) => (
                 <tr key={tt.pairId}>
                   <td><strong>{tt.hubName ?? "—"}</strong></td>
                   <td style={{ fontSize: 12, fontFamily: "monospace" }}>{tt.ttIncidentId ?? "—"}</td>
@@ -211,6 +329,11 @@ export default function Analytics() {
               ))}
             </tbody>
           </HTMLTable>
+        )}
+        {sortedTravelTimes.length > ttVisible && (
+          <div style={{ textAlign: "center", padding: 8 }}>
+            <Button small minimal text={`Load More (${sortedTravelTimes.length - ttVisible} remaining)`} onClick={() => setTtVisible(v => v + PAGE_SIZE)} />
+          </div>
         )}
       </Card>
 
@@ -246,7 +369,7 @@ export default function Analytics() {
       </div>
       <Card className="panel-card">
         {journeyPlans.isLoading && !journeyPlans.data && (
-          <div style={{ padding: 24, textAlign: "center" }}><Spinner /></div>
+          <Skeleton />
         )}
         {(journeyPlans.data ?? []).length === 0 && !journeyPlans.isLoading && (
           <div className="empty-state">
@@ -267,11 +390,11 @@ export default function Analytics() {
                   Duration <Icon icon={jpSort === "asc" ? "sort-asc" : "sort-desc"} size={12} />
                 </th>
                 <th>Modes</th>
-                <th>Summary</th>
+                <th>Route Steps</th>
               </tr>
             </thead>
             <tbody>
-              {sortedJourneyPlans.map((jp) => (
+              {sortedJourneyPlans.slice(0, jpVisible).map((jp) => (
                 <tr key={jp.journeyId}>
                   <td><strong>{jp.originName ?? "—"}</strong></td>
                   <td><strong>{jp.destinationName ?? "—"}</strong></td>
@@ -281,13 +404,18 @@ export default function Analytics() {
                     </Tag>
                   </td>
                   <td style={{ fontSize: 12 }}>{jp.modesUsed ?? "—"}</td>
-                  <td style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, color: "#738694" }}>
-                    {jp.legsSummary ?? "—"}
+                  <td style={{ maxWidth: 350, fontSize: 12, color: "#738694", lineHeight: 1.4 }}>
+                    {formatLegsSummary(jp.legsSummary)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </HTMLTable>
+        )}
+        {sortedJourneyPlans.length > jpVisible && (
+          <div style={{ textAlign: "center", padding: 8 }}>
+            <Button small minimal text={`Load More (${sortedJourneyPlans.length - jpVisible} remaining)`} onClick={() => setJpVisible(v => v + PAGE_SIZE)} />
+          </div>
         )}
       </Card>
 
@@ -298,7 +426,30 @@ export default function Analytics() {
         </Tag>
       </div>
 
-      {/* Incident Trends */}
+      {/* Incident Trends Chart */}
+      {trendChartData.length > 1 && (
+        <Card className="panel-card" style={{ marginBottom: 20, padding: 16 }}>
+          <h4 style={{ margin: "0 0 12px 0", fontSize: 13 }}>
+            <Icon icon="chart" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
+            Daily Incident Trend
+          </h4>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={trendChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e1e8ed" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="severe" stroke="#c23030" strokeWidth={2} dot={false} name="Severe" />
+              <Line type="monotone" dataKey="serious" stroke="#d9822b" strokeWidth={2} dot={false} name="Serious" />
+              <Line type="monotone" dataKey="moderate" stroke="#2d72d2" strokeWidth={1.5} dot={false} name="Moderate" />
+              <Line type="monotone" dataKey="minimal" stroke="#738694" strokeWidth={1} dot={false} name="Minimal" />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Incident Trends Table */}
       <div className="section-header">
         <h4>
           <Icon icon="trending-up" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
@@ -310,7 +461,7 @@ export default function Analytics() {
       </div>
       <Card className="panel-card" style={{ marginBottom: 20 }}>
         {incidentTrends.isLoading && !incidentTrends.data && (
-          <div style={{ padding: 24, textAlign: "center" }}><Spinner /></div>
+          <Skeleton />
         )}
         {(incidentTrends.data ?? []).length > 0 && (
           <HTMLTable bordered striped style={{ width: "100%" }}>
@@ -324,7 +475,7 @@ export default function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {(incidentTrends.data ?? []).map((t) => (
+              {(incidentTrends.data ?? []).slice(0, trendsVisible).map((t) => (
                 <tr key={t.trendId}>
                   <td style={{ fontFamily: "monospace", fontSize: 12 }}>{t.incidentDate ?? "—"}</td>
                   <td>
@@ -348,9 +499,33 @@ export default function Analytics() {
             </tbody>
           </HTMLTable>
         )}
+        {(incidentTrends.data ?? []).length > trendsVisible && (
+          <div style={{ textAlign: "center", padding: 8 }}>
+            <Button small minimal text={`Load More (${(incidentTrends.data ?? []).length - trendsVisible} remaining)`} onClick={() => setTrendsVisible(v => v + PAGE_SIZE)} />
+          </div>
+        )}
       </Card>
 
-      {/* Peak Hour Heatmap */}
+      {/* Peak Hours Bar Chart */}
+      {peakChartData.length > 0 && (
+        <Card className="panel-card" style={{ marginBottom: 20, padding: 16 }}>
+          <h4 style={{ margin: "0 0 12px 0", fontSize: 13 }}>
+            <Icon icon="heat-grid" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
+            Top Disruption Times
+          </h4>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={peakChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e1e8ed" />
+              <XAxis dataKey="label" tick={{ fontSize: 9 }} angle={-30} textAnchor="end" height={50} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip />
+              <Bar dataKey="incidents" fill="#d9822b" radius={[3, 3, 0, 0]} name="Incidents" />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Peak Hour Heatmap Table */}
       <div className="section-header">
         <h4>
           <Icon icon="heat-grid" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
@@ -362,7 +537,7 @@ export default function Analytics() {
       </div>
       <Card className="panel-card" style={{ marginBottom: 20 }}>
         {peakHours.isLoading && !peakHours.data && (
-          <div style={{ padding: 24, textAlign: "center" }}><Spinner /></div>
+          <Skeleton />
         )}
         {(peakHours.data ?? []).length > 0 && (
           <HTMLTable bordered striped style={{ width: "100%" }}>
@@ -375,7 +550,7 @@ export default function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {(peakHours.data ?? []).map((ph) => (
+              {(peakHours.data ?? []).slice(0, peakVisible).map((ph) => (
                 <tr key={ph.heatmapId}>
                   <td><strong>{ph.dayName ?? "—"}</strong></td>
                   <td style={{ fontFamily: "monospace" }}>{ph.hourOfDay != null ? `${String(ph.hourOfDay).padStart(2, "0")}:00` : "—"}</td>
@@ -394,9 +569,41 @@ export default function Analytics() {
             </tbody>
           </HTMLTable>
         )}
+        {(peakHours.data ?? []).length > peakVisible && (
+          <div style={{ textAlign: "center", padding: 8 }}>
+            <Button small minimal text={`Load More (${(peakHours.data ?? []).length - peakVisible} remaining)`} onClick={() => setPeakVisible(v => v + PAGE_SIZE)} />
+          </div>
+        )}
       </Card>
 
-      {/* Transport Hotspots */}
+      {/* Transport Hotspots Chart */}
+      {(hotspots.data ?? []).length > 0 && (
+        <Card className="panel-card" style={{ marginBottom: 20, padding: 16 }}>
+          <h4 style={{ margin: "0 0 12px 0", fontSize: 13 }}>
+            <Icon icon="map-marker" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
+            Hotspot Severity Ranking
+          </h4>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart
+              data={(hotspots.data ?? []).slice(0, 10).map(hs => ({
+                name: findNearestLocation(hs.gridLat, hs.gridLng, locations.data ?? []).slice(0, 20),
+                score: Number(hs.weightedSeverityScore ?? 0),
+                incidents: Number(hs.totalIncidents ?? 0),
+              }))}
+              layout="vertical"
+              margin={{ top: 5, right: 20, left: 100, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e1e8ed" />
+              <XAxis type="number" tick={{ fontSize: 10 }} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={95} />
+              <Tooltip />
+              <Bar dataKey="score" fill="#c23030" radius={[0, 3, 3, 0]} name="Severity Score" />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Transport Hotspots Table */}
       <div className="section-header">
         <h4>
           <Icon icon="map-marker" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
@@ -408,14 +615,14 @@ export default function Analytics() {
       </div>
       <Card className="panel-card">
         {hotspots.isLoading && !hotspots.data && (
-          <div style={{ padding: 24, textAlign: "center" }}><Spinner /></div>
+          <Skeleton />
         )}
         {(hotspots.data ?? []).length > 0 && (
           <HTMLTable bordered striped style={{ width: "100%" }}>
             <thead>
               <tr>
                 <th>#</th>
-                <th>Grid Cell</th>
+                <th>Nearest Location</th>
                 <th>Incidents</th>
                 <th>Severity Score</th>
                 <th>Active Days</th>
@@ -423,7 +630,7 @@ export default function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {(hotspots.data ?? []).map((hs) => (
+              {(hotspots.data ?? []).slice(0, hotspotsVisible).map((hs) => (
                 <tr key={hs.gridCell}>
                   <td>
                     <Tag
@@ -434,8 +641,8 @@ export default function Analytics() {
                       #{hs.hotspotRank ?? "—"}
                     </Tag>
                   </td>
-                  <td style={{ fontFamily: "monospace", fontSize: 12 }}>
-                    {hs.gridLat?.toFixed(2)}, {hs.gridLng?.toFixed(2)}
+                  <td style={{ fontSize: 12 }}>
+                    <strong>{findNearestLocation(hs.gridLat, hs.gridLng, locations.data ?? [])}</strong>
                   </td>
                   <td><strong>{hs.totalIncidents ?? 0}</strong></td>
                   <td style={{ color: "#c23030", fontWeight: 600 }}>{hs.weightedSeverityScore ?? 0}</td>
@@ -445,6 +652,11 @@ export default function Analytics() {
               ))}
             </tbody>
           </HTMLTable>
+        )}
+        {(hotspots.data ?? []).length > hotspotsVisible && (
+          <div style={{ textAlign: "center", padding: 8 }}>
+            <Button small minimal text={`Load More (${(hotspots.data ?? []).length - hotspotsVisible} remaining)`} onClick={() => setHotspotsVisible(v => v + 10)} />
+          </div>
         )}
       </Card>
     </div>

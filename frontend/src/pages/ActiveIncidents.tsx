@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState, useMemo } from "react";
 import { Card, Tag, Intent, Spinner, HTMLTable, InputGroup, Callout, Icon, Button, HTMLSelect } from "@blueprintjs/core";
+import { exportToCsv } from "../utils/csvExport";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { LiveIncident } from "@crisis-logistics-command-app/sdk";
 
@@ -128,6 +129,20 @@ export default function ActiveIncidents() {
           <span style={{ fontWeight: 600, fontSize: 14, color: "#1c2127" }}>
             Incidents ({filtered.length})
           </span>
+          <Button
+            small
+            minimal
+            icon="export"
+            text="CSV"
+            onClick={() => exportToCsv("incidents", filtered.map(i => ({
+              severity: i.severityLevel ?? "",
+              type: i.incidentType ?? "",
+              description: i.description ?? "",
+              latitude: i.latitude ?? "",
+              longitude: i.longitude ?? "",
+              updated: i.polledAt ?? "",
+            })))}
+          />
           <InputGroup
             leftIcon="search"
             placeholder="Search..."
@@ -204,7 +219,7 @@ export default function ActiveIncidents() {
                   Severity {sortField === "severity" && <Icon icon={sortDir === "asc" ? "sort-asc" : "sort-desc"} size={12} />}
                 </th>
                 <th>Type</th>
-                <th>Description</th>
+
                 <th
                   style={{ cursor: "pointer", userSelect: "none" }}
                   onClick={() => toggleSort("updated")}
@@ -226,9 +241,7 @@ export default function ActiveIncidents() {
                     </Tag>
                   </td>
                   <td style={{ fontSize: 12 }}>{inc.incidentType ?? "—"}</td>
-                  <td style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>
-                    {inc.description ?? "—"}
-                  </td>
+
                   <td style={{ fontSize: 11, color: "#738694", whiteSpace: "nowrap" }}>
                     {inc.polledAt != null ? new Date(inc.polledAt).toLocaleDateString() : "—"}
                   </td>

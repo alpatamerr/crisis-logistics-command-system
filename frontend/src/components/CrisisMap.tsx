@@ -1,5 +1,7 @@
 import { useMemo, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
+// Clustering disabled — CircleMarkers don't cluster properly
+// import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 
 // ─── Types ───

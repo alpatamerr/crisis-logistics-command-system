@@ -1,13 +1,16 @@
 import { useState, useMemo, useCallback } from "react";
 import {
   Card, Tag, Intent, Spinner, HTMLTable, Button, Callout, Icon,
-  NumericInput, Dialog, DialogBody, DialogFooter, FormGroup, Switch, HTMLSelect
+  NumericInput, Dialog, DialogBody, DialogFooter, FormGroup, Switch, HTMLSelect,
+  OverlayToaster, Position
 } from "@blueprintjs/core";
+
+const toaster = OverlayToaster.createAsync({ position: Position.TOP });
 import { useOsdkObjects, useOsdkAction } from "@osdk/react/experimental";
 import { CrisisResource, LiveTransportUnit, LiveLocation, $Actions } from "@crisis-logistics-command-app/sdk";
 
 type SortDir = "asc" | "desc";
-const FLEET_PAGE_SIZE = 50;
+const FLEET_PAGE_SIZE = 25;
 
 export default function ResourcesFleet() {
   // ─── Resources State ───
@@ -115,16 +118,18 @@ export default function ResourcesFleet() {
       setNewThreshold(10);
       setNewLocationId("");
       setShowCreateForm(false);
+      (await toaster).show({ message: "Resource created successfully", intent: Intent.SUCCESS, icon: "tick" });
     } catch {
-      // error handled by hook
+      (await toaster).show({ message: "Failed to create resource", intent: Intent.DANGER, icon: "error" });
     }
   }, [createAction, newResourceType, newQuantity, newThreshold, newLocationId, locations.data]);
 
   const handleDelete = useCallback(async (res: CrisisResource.OsdkInstance) => {
     try {
       await deleteAction.applyAction({ "crisis-resource": res });
+      (await toaster).show({ message: "Resource deleted", intent: Intent.WARNING, icon: "trash" });
     } catch {
-      // error handled by hook
+      (await toaster).show({ message: "Failed to delete resource", intent: Intent.DANGER, icon: "error" });
     }
   }, [deleteAction]);
 
@@ -139,8 +144,9 @@ export default function ResourcesFleet() {
     try {
       await updateAction.applyAction({ "resource": target, "new-quantity": updateQty });
       setUpdateTarget(null);
+      (await toaster).show({ message: "Quantity updated", intent: Intent.SUCCESS, icon: "tick" });
     } catch {
-      // error handled by hook
+      (await toaster).show({ message: "Failed to update resource", intent: Intent.DANGER, icon: "error" });
     }
   }, [updateAction, updateTarget, updateQty, resources.data]);
 
@@ -421,7 +427,18 @@ export default function ResourcesFleet() {
                     } minimal style={{ fontSize: 11 }}>{unit.vehicleType ?? "—"}</Tag>
                   </td>
                   <td style={{ fontSize: 12 }}>{unit.unitStatus ?? "—"}</td>
-                  <td style={{ fontSize: 11, color: "#738694" }}>{unit.lastSeenAt ?? "—"}</td>
+                  <td style={{ fontSize: 11, color: "#738694" }}>
+                    {unit.lastSeenAt
+                      ? (() => {
+                          const diff = Date.now() - new Date(unit.lastSeenAt).getTime();
+                          const mins = Math.floor(diff / 60000);
+                          if (mins < 60) { return `${mins}m ago`; }
+                          const hrs = Math.floor(mins / 60);
+                          if (hrs < 24) { return `${hrs}h ago`; }
+                          return `${Math.floor(hrs / 24)}d ago`;
+                        })()
+                      : "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>

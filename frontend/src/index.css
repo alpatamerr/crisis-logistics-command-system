@@ -1,3 +1,9 @@
+/* ─── Skeleton Shimmer Animation ─── */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* ─── Reset & Base ─── */
 * {
   box-sizing: border-box;
@@ -8,6 +14,144 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
   background: #f6f7f9;
   color: #1c2127;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ─── Dark Mode ─── */
+body.bp5-dark {
+  background: #1c2127;
+  color: #f5f8fa;
+}
+
+body.bp5-dark .panel-card,
+body.bp5-dark .metric-card,
+body.bp5-dark .detail-panel,
+body.bp5-dark .filter-panel {
+  background: #252a31 !important;
+  border-color: #394b59 !important;
+}
+
+body.bp5-dark .bp5-html-table th {
+  background: #2f343c;
+  color: #a7b6c2;
+  border-bottom-color: #394b59;
+}
+
+body.bp5-dark .bp5-html-table td {
+  border-bottom-color: #30363d;
+}
+
+body.bp5-dark .section-header h4 {
+  color: #f5f8fa;
+}
+
+body.bp5-dark .histogram-item:hover {
+  background: #30363d;
+}
+
+body.bp5-dark .inline-form {
+  background: #252a31;
+  border-bottom-color: #394b59;
+}
+
+body.bp5-dark .bp5-html-table td {
+  color: #f5f8fa !important;
+  background: #252a31 !important;
+}
+
+body.bp5-dark .bp5-html-table th {
+  color: #e1e8ed !important;
+  background: #1c2127 !important;
+  border-bottom-color: #394b59 !important;
+}
+
+body.bp5-dark .bp5-html-table tr:hover td {
+  background: #30363d !important;
+}
+
+body.bp5-dark .bp5-html-table.bp5-html-table-striped tbody tr:nth-child(odd) td {
+  background: #2a3038 !important;
+}
+
+body.bp5-dark .bp5-card {
+  background: #252a31 !important;
+  border-color: #394b59 !important;
+}
+
+body.bp5-dark .bp5-tag.bp5-minimal {
+  color: #f5f8fa;
+}
+
+body.bp5-dark .metric-title {
+  color: #a7b6c2;
+}
+
+body.bp5-dark .empty-state {
+  color: #a7b6c2;
+}
+
+body.bp5-dark .histogram-label {
+  color: #e1e8ed;
+}
+
+body.bp5-dark .histogram-bar-container {
+  background: #394b59;
+}
+
+body.bp5-dark .histogram-count {
+  color: #a7b6c2;
+}
+
+body.bp5-dark .detail-panel .detail-label {
+  color: #a7b6c2;
+}
+
+body.bp5-dark .detail-panel .detail-value {
+  color: #f5f8fa;
+}
+
+body.bp5-dark .detail-description {
+  background: #1c2127;
+  color: #e1e8ed;
+}
+
+body.bp5-dark .detail-panel .detail-row {
+  border-bottom-color: #394b59;
+}
+
+body.bp5-dark .detail-panel .detail-header {
+  border-bottom-color: #394b59;
+}
+
+body.bp5-dark .app-footer {
+  color: #738694;
+}
+
+body.bp5-dark .bp5-input {
+  background: #1c2127;
+  color: #f5f8fa;
+  border-color: #394b59;
+}
+
+body.bp5-dark .bp5-html-select select {
+  background: #1c2127;
+  color: #f5f8fa;
+}
+
+body.bp5-dark .bp5-tab {
+  color: #a7b6c2;
+}
+
+body.bp5-dark .bp5-tab[aria-selected="true"] {
+  color: #f5f8fa;
+}
+
+body.bp5-dark .recharts-cartesian-grid line {
+  stroke: #394b59;
+}
+
+body.bp5-dark .recharts-text {
+  fill: #a7b6c2;
 }
 
 /* ─── Metric Cards Grid ─── */
@@ -28,7 +172,17 @@ body {
 }
 
 .metric-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-2px);
+}
+
+/* ─── Card Hover Lift ─── */
+.panel-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.panel-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
 }
 
 .metric-value {

@@ -162,7 +162,7 @@ export default function TransportStatus() {
                     <Tag intent={Intent.WARNING} minimal>{line.statusDescription ?? "—"}</Tag>
                   </td>
                   <td style={{ fontSize: 12, color: "#738694" }}>{line.statusSeverity ?? "—"}</td>
-                  <td style={{ maxWidth: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>
+                  <td style={{ maxWidth: 400, fontSize: 12, color: "#394b59", lineHeight: 1.4 }}>
                     {line.disruptionReason ?? "—"}
                   </td>
                 </tr>

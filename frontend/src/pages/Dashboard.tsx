@@ -1,5 +1,6 @@
-import { lazy, Suspense, useMemo, useState, Component, type ReactNode } from "react";
+import { lazy, Suspense, useMemo, useState, useEffect, useRef, Component, type ReactNode } from "react";
 import { Card, Tag, Intent, Spinner, Callout, Icon, Button, ButtonGroup } from "@blueprintjs/core";
+import { notifySevereIncident } from "../utils/notifications";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { LiveIncident, LiveLocation, LineStatus, CrisisResource, LiveTransportUnit } from "@crisis-logistics-command-app/sdk";
 
@@ -151,6 +152,16 @@ export default function Dashboard() {
   const disrupted = useOsdkObjects(LineStatus, { where: { isDisrupted: { $eq: true } }, pageSize: 100 });
   const resources = useOsdkObjects(CrisisResource, { pageSize: 100 });
   const units = useOsdkObjects(LiveTransportUnit, { pageSize: 200 });
+
+  // Notify on new severe incidents
+  const prevSevereCount = useRef(0);
+  useEffect(() => {
+    const severeCount = (incidents.data ?? []).filter(i => i.severityLevel === "Severe").length;
+    if (severeCount > prevSevereCount.current && prevSevereCount.current > 0) {
+      notifySevereIncident(severeCount);
+    }
+    prevSevereCount.current = severeCount;
+  }, [incidents.data]);
 
   // Compute TYPE histogram from incidents
   const typeHistogram = useMemo(() => {
