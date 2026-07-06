@@ -98,7 +98,7 @@ React 19 operational dashboard with 5 tabs:
 
 **Tech:** React 19 · TypeScript 6 · Vite 8 · BlueprintJS 6 · Leaflet · Recharts · @osdk/react
 
-**Production Features:** Auto-refresh (15min countdown) · CSV export · Browser notifications for severe incidents · Loading skeletons · Toast notifications · Per-section error boundaries · Live pulse indicator
+**Features:** Auto-refresh (15min countdown) · CSV export · Browser notifications for severe incidents · Loading skeletons · Toast notifications · Per-section error boundaries · Live pulse indicator
 
 
 ## ⚙️ Functions (`functions/`)
