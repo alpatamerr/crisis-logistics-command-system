@@ -24,6 +24,7 @@ The Crisis Logistics Command Center provides real-time situational awareness for
 | **Framework** | React 19 + TypeScript 6 |
 | **Build** | Vite 8 (Rolldown bundler, ~430ms builds) |
 | **UI Components** | BlueprintJS 6 (Palantir's design system) |
+| **Charts** | Recharts (line, bar, horizontal bar) |
 | **Data Layer** | Palantir OSDK (`@osdk/react` experimental hooks) |
 | **Maps** | Leaflet + react-leaflet 5 (CartoDB Voyager tiles) |
 | **Routing** | React Router 8 |
@@ -34,25 +35,32 @@ The Crisis Logistics Command Center provides real-time situational awareness for
 
 ```
 src/
-├── main.tsx                    # App entry — OsdkProvider2, CSS imports
-├── client.ts                   # OSDK OAuth client setup
-├── router.tsx                  # Routes: / and /auth/callback
-├── AuthCallback.tsx            # OAuth callback handler
-├── Home.tsx                    # Main layout — Navbar + 5 Tabs
-├── Home.css                    # Tab & navbar styling
-├── index.css                   # Global styles, grid layouts, histograms
+├── main.tsx                     # App entry — OsdkProvider2, CSS imports
+├── client.ts                    # OSDK OAuth client setup
+├── router.tsx                   # Routes: / and /auth/callback
+├── AuthCallback.tsx             # OAuth callback handler
+├── Home.tsx                     # Main layout — Navbar + Tabs + Live indicator + Auto-refresh
+├── Home.css                     # Navbar gradient, live pulse animation
+├── index.css                    # Global styles, grid layouts, hover effects, shimmer skeleton
 │
 ├── components/
-│   ├── CrisisMap.tsx           # Leaflet map with severity markers, legend, reset
-│   ├── ErrorBoundary.tsx       # Global error boundary
-│   └── Loading.tsx             # Loading spinner
+│   ├── CrisisMap.tsx            # Leaflet map with severity markers, legend, reset view
+│   ├── SectionErrorBoundary.tsx # Per-section error boundary with retry button
+│   ├── ErrorBoundary.tsx        # Global error boundary
+│   └── Loading.tsx              # Loading spinner
+│
+├── utils/
+│   ├── autoRefresh.ts           # 15-min auto-refresh hook with countdown timer
+│   ├── csvExport.ts             # CSV file download utility
+│   └── notifications.ts         # Browser notification for severe incidents
 │
 └── pages/
-    ├── Dashboard.tsx           # Tab 1: Situation Overview (map + histograms + metrics)
-    ├── ActiveIncidents.tsx     # Tab 2: Incident table with detail panel + mini-map
-    ├── TransportStatus.tsx     # Tab 3: Disrupted lines, roads, bus arrivals
-    ├── ResourcesFleet.tsx      # Tab 4: Resource CRUD + fleet monitoring
-    └── Analytics.tsx           # Tab 5: Travel times, journey plans, air quality, PySpark analytics
+    ├── Dashboard.tsx            # Tab 1: Map + histograms + metrics + severe alert
+    ├── ActiveIncidents.tsx      # Tab 2: Incident table + detail panel + CSV export
+    ├── TransportStatus.tsx      # Tab 3: Disrupted lines, roads, bus arrivals
+    ├── ResourcesFleet.tsx       # Tab 4: Resource CRUD + toast + fleet monitoring
+    └── Analytics.tsx            # Tab 5: Charts + tables + PySpark analytics
+
 ```
 
 ## 🗄️ Ontology Data Model
@@ -183,12 +191,21 @@ https://*.basemaps.cartocdn.com
 
 ## 🛠️ Key Technical Decisions
 
+## 🛠️ Key Technical Decisions
+
 1. **`@osdk/react` experimental hooks** (`useOsdkObjects`, `useOsdkAction`) — provides reactive data fetching with automatic caching
 2. **Leaflet over Google Maps** — Google Maps blocked by CSP `script-src 'self'`; Leaflet works with `img-src` CSP for tile loading
 3. **Client-side filtering and sorting** — all data loaded via OSDK, then filtered/sorted in-memory for instant UI response
 4. **BlueprintJS** — Palantir's own design system ensures visual consistency with Foundry Workshop
 5. **Lazy-loaded map** — `CrisisMap` uses `React.lazy()` to avoid blocking initial page load
 6. **Vite 8 + Rolldown** — Rust-based bundler for ~430ms production builds (10x faster than Vite 7)
+7. **Auto-refresh (15min)** — visible countdown timer in navbar; manual refresh on click; matches pipeline schedule
+8. **Browser notifications** — alerts operators when new severe incidents are detected
+9. **Per-section error boundaries** — one tab crashing doesn't bring down the entire app; each section has retry
+10. **Recharts** — lightweight React-native charting for incident trends, peak hours bar chart, hotspot severity ranking
+11. **Toast notifications** — immediate feedback after CRUD operations (create/update/delete)
+12. **CSV export** — one-click data download for incident records
+
 
 ## 📝 License
 
