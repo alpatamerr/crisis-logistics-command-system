@@ -83,6 +83,8 @@ flowchart TB
 | ⚡ `incident_trend_analysis` | PySpark on raw_live_incidents | Daily trends + 7-day rolling avg |
 | ⚡ `peak_hour_heatmap` | PySpark on raw_live_incidents | Hour × day disruption matrix |
 | ⚡ `transport_reliability` | PySpark on raw_live_incidents | Geographic hotspot detection |
+| ⚡ `anomaly_detection` | PySpark on raw_live_incidents | Z-score anomaly detection (SPIKE/DROP/NORMAL) |
+
 
 All API keys are stored securely in Foundry's secret vault — no hardcoded credentials.
 
