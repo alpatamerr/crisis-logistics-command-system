@@ -93,12 +93,15 @@ All API keys are stored securely in Foundry's secret vault — no hardcoded cred
 React 19 operational dashboard with 5 tabs:
 
 1. **Situation Overview** — Interactive Leaflet map with severity markers, histogram filters, time range
-2. **Active Incidents** — Master-detail table with severity/type filters, mini-map flyTo
+2. **Active Incidents** — Master-detail table with severity/type filters, mini-map flyTo, CSV export
 3. **Transport Status** — Disrupted lines, road conditions, bus arrivals with mode filters
-4. **Resources & Fleet** — CRUD resource management via OSDK Actions, fleet monitoring
-5. **Analytics** — Travel times, journey plans, air quality metrics + ⚡ PySpark-powered incident trends, peak hours, transport hotspots
+4. **Resources & Fleet** — CRUD resource management via OSDK Actions, fleet monitoring, toast notifications
+5. **Analytics** — Travel times, journey plans, air quality metrics + ⚡ PySpark-powered charts (line, bar, horizontal bar)
 
-**Tech:** React 19 · TypeScript 6 · Vite 8 · BlueprintJS 6 · Leaflet · @osdk/react
+**Tech:** React 19 · TypeScript 6 · Vite 8 · BlueprintJS 6 · Leaflet · Recharts · @osdk/react
+
+**Production Features:** Auto-refresh (15min countdown) · CSV export · Browser notifications for severe incidents · Loading skeletons · Toast notifications · Per-section error boundaries · Live pulse indicator
+
 
 ## ⚙️ Functions (`functions/`)
 
