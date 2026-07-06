@@ -126,4 +126,4 @@ TypeScript v2 Foundry Functions providing server-side logic for:
 
 ## 📝 License
 
-Proprietary, built for demonstration purposes.
+Proprietary, built for a private client; shared here for portfolio/demonstration purposes.
