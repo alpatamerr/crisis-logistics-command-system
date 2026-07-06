@@ -4,6 +4,8 @@ A full-stack real-time crisis logistics platform for West London, built on **Pal
 
 > ⚠️ **Note:** This system runs on [Palantir Foundry](https://www.palantir.com/platforms/foundry/) and requires a Foundry instance with the configured Ontology. Source code is provided for portfolio/review purposes.
 
+> > 💼 **Context:** Built as a freelance project for a private client requiring real-time situational awareness across West London's transport and incident data.
+
 ## 📁 Repository Structure
 
 | Directory | Stack | Description |
