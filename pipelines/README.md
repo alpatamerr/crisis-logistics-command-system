@@ -160,7 +160,7 @@ Production data quality checks on key transforms:
 |current_incidents |	longitude not null | WARN |
 |current_incidents |	severity_level not null |	WARN |
 
-
+---
 
 ## React OSDK / Workshop Application (5 Tabs)
 
