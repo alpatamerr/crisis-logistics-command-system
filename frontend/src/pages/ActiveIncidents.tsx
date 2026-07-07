@@ -1,8 +1,10 @@
 import { lazy, Suspense, useState, useMemo } from "react";
-import { Card, Tag, Intent, Spinner, HTMLTable, InputGroup, Callout, Icon, Button, HTMLSelect } from "@blueprintjs/core";
+import { Card, Tag, Intent, Spinner, HTMLTable, Callout, Icon } from "@blueprintjs/core";
 import { exportToCsv } from "../utils/csvExport";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { LiveIncident } from "@crisis-logistics-command-app/sdk";
+import Pagination from "@/components/Pagination";
+import FilterBar, { FilterSection, FilterOption } from "@/components/FilterBar";
 
 const CrisisMap = lazy(() => import("@/components/CrisisMap"));
 
@@ -25,12 +27,11 @@ const SEVERITY_LEVELS = ["Severe", "Serious", "Moderate", "Minimal"];
 type SortField = "severity" | "updated";
 type SortDir = "asc" | "desc";
 
-const PAGE_SIZE = 25;
-
 export default function ActiveIncidents() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Filters
   const [severityFilters, setSeverityFilters] = useState<Set<string>>(new Set());
@@ -45,7 +46,6 @@ export default function ActiveIncidents() {
     pageSize: 200,
   });
 
-  // Unique incident types for filter
   const incidentTypes = useMemo(() => {
     const types = new Set<string>();
     (incidents.data ?? []).forEach(inc => {
@@ -62,6 +62,7 @@ export default function ActiveIncidents() {
       if (next.has(sev)) { next.delete(sev); } else { next.add(sev); }
       return next;
     });
+    setCurrentPage(1);
   };
 
   const toggleSort = (field: SortField) => {
@@ -75,7 +76,6 @@ export default function ActiveIncidents() {
 
   const filtered = useMemo(() => {
     let data = (incidents.data ?? []).filter((inc) => {
-      // Text search
       if (search) {
         const term = search.toLowerCase();
         const desc = String(inc.description ?? "").toLowerCase();
@@ -85,18 +85,15 @@ export default function ActiveIncidents() {
           return false;
         }
       }
-      // Severity filter
       if (severityFilters.size > 0 && !severityFilters.has(inc.severityLevel ?? "")) {
         return false;
       }
-      // Type filter
       if (typeFilter && inc.incidentType !== typeFilter) {
         return false;
       }
       return true;
     });
 
-    // Sort
     data = [...data].sort((a, b) => {
       if (sortField === "severity") {
         const aOrder = SEVERITY_ORDER[a.severityLevel ?? ""] ?? 5;
@@ -111,93 +108,86 @@ export default function ActiveIncidents() {
     return data;
   }, [incidents.data, search, severityFilters, typeFilter, sortField, sortDir]);
 
-  const visible = filtered.slice(0, visibleCount);
-  const hasMore = visibleCount < filtered.length;
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const selected = useMemo(
     () => (incidents.data ?? []).find((inc) => inc.incidentId === selectedId) ?? null,
     [incidents.data, selectedId]
   );
 
-  const activeFilterCount = severityFilters.size + (typeFilter ? 1 : 0) + (search ? 1 : 0);
+  const activeFilters = [
+    ...Array.from(severityFilters).map(sev => ({
+      key: `sev-${sev}`,
+      label: sev,
+      intent: SEVERITY_INTENT[sev],
+      onRemove: () => toggleSeverityFilter(sev),
+    })),
+    ...(typeFilter ? [{
+      key: "type",
+      label: typeFilter,
+      intent: Intent.NONE as Intent,
+      onRemove: () => { setTypeFilter(null); setCurrentPage(1); },
+    }] : []),
+  ];
+
+  const clearAll = () => {
+    setSeverityFilters(new Set());
+    setTypeFilter(null);
+    setSearch("");
+    setCurrentPage(1);
+  };
 
   return (
     <div className="split-layout split-layout-master-detail" style={{ height: "calc(100vh - 160px)" }}>
       {/* Left: Incident Table */}
       <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {/* Search + count */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexShrink: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: 14, color: "#1c2127" }}>
-            Incidents ({filtered.length})
-          </span>
-          <Button
-            small
-            minimal
-            icon="export"
-            text="CSV"
-            onClick={() => exportToCsv("incidents", filtered.map(i => ({
-              severity: i.severityLevel ?? "",
-              type: i.incidentType ?? "",
-              description: i.description ?? "",
-              latitude: i.latitude ?? "",
-              longitude: i.longitude ?? "",
-              updated: i.polledAt ?? "",
-            })))}
-          />
-          <InputGroup
-            leftIcon="search"
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }}
-            style={{ width: 220 }}
-            small
-          />
-        </div>
-
-        {/* Filter bar */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap", flexShrink: 0 }}>
-          {/* Severity chips */}
-          {SEVERITY_LEVELS.map(sev => (
-            <Tag
-              key={sev}
-              interactive
-              intent={severityFilters.has(sev) ? SEVERITY_INTENT[sev] : Intent.NONE}
-              minimal={!severityFilters.has(sev)}
-              onClick={() => { toggleSeverityFilter(sev); setVisibleCount(PAGE_SIZE); }}
-              style={{ cursor: "pointer", fontSize: 11 }}
+        <FilterBar
+          search={{
+            value: search,
+            onChange: (v) => { setSearch(v); setCurrentPage(1); },
+            placeholder: "Search incidents...",
+          }}
+          activeFilters={activeFilters}
+          onClearAll={clearAll}
+          extra={
+            <button
+              className="export-btn"
+              onClick={() => exportToCsv("incidents", filtered.map(i => ({
+                severity: i.severityLevel ?? "",
+                type: i.incidentType ?? "",
+                description: i.description ?? "",
+                latitude: i.latitude ?? "",
+                longitude: i.longitude ?? "",
+                updated: i.polledAt ?? "",
+              })))}
             >
-              {sev}
-            </Tag>
-          ))}
-
-          <div style={{ width: 1, height: 16, background: "#d8e1e8" }} />
-
-          {/* Type filter dropdown */}
-          <HTMLSelect
-            value={typeFilter ?? ""}
-            onChange={(e) => { setTypeFilter(e.target.value || null); setVisibleCount(PAGE_SIZE); }}
-            minimal
-            style={{ fontSize: 12 }}
-          >
-            <option value="">All Types</option>
-            {incidentTypes.map(t => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </HTMLSelect>
-
-          {activeFilterCount > 0 && (
-            <>
-              <div style={{ flex: 1 }} />
-              <Button
-                small
-                minimal
-                intent={Intent.WARNING}
-                icon="filter-remove"
-                text="Clear"
-                onClick={() => { setSeverityFilters(new Set()); setTypeFilter(null); setSearch(""); }}
+              <Icon icon="export" size={12} />
+              <span>Export</span>
+            </button>
+          }
+        >
+          <FilterSection title="Severity">
+            {SEVERITY_LEVELS.map(sev => (
+              <FilterOption
+                key={sev}
+                label={sev}
+                selected={severityFilters.has(sev)}
+                onClick={() => toggleSeverityFilter(sev)}
+                intent={SEVERITY_INTENT[sev]}
               />
-            </>
-          )}
-        </div>
+            ))}
+          </FilterSection>
+          <FilterSection title="Incident Type">
+            {incidentTypes.map(t => (
+              <FilterOption
+                key={t}
+                label={t}
+                selected={typeFilter === t}
+                onClick={() => { setTypeFilter(typeFilter === t ? null : t); setCurrentPage(1); }}
+              />
+            ))}
+          </FilterSection>
+        </FilterBar>
 
         {incidents.error && (
           <Callout intent={Intent.DANGER} title="Error" style={{ marginBottom: 8 }} icon="error">
@@ -219,7 +209,6 @@ export default function ActiveIncidents() {
                   Severity {sortField === "severity" && <Icon icon={sortDir === "asc" ? "sort-asc" : "sort-desc"} size={12} />}
                 </th>
                 <th>Type</th>
-
                 <th
                   style={{ cursor: "pointer", userSelect: "none" }}
                   onClick={() => toggleSort("updated")}
@@ -241,7 +230,6 @@ export default function ActiveIncidents() {
                     </Tag>
                   </td>
                   <td style={{ fontSize: 12 }}>{inc.incidentType ?? "—"}</td>
-
                   <td style={{ fontSize: 11, color: "#738694", whiteSpace: "nowrap" }}>
                     {inc.polledAt != null ? new Date(inc.polledAt).toLocaleDateString() : "—"}
                   </td>
@@ -250,17 +238,14 @@ export default function ActiveIncidents() {
             </tbody>
           </HTMLTable>
 
-          {hasMore && (
-            <div style={{ textAlign: "center", padding: 12 }}>
-              <Button
-                text={`Load more (${visibleCount}/${filtered.length})`}
-                onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
-                minimal
-                small
-                intent={Intent.PRIMARY}
-              />
-            </div>
-          )}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+            totalItems={filtered.length}
+          />
         </Card>
       </div>
 
@@ -311,7 +296,6 @@ export default function ActiveIncidents() {
               <div className="detail-description">{selected.description}</div>
             )}
 
-            {/* Mini Map */}
             {selected.latitude != null && selected.longitude != null && (
               <div style={{ marginTop: 16 }}>
                 <Suspense fallback={<Spinner size={20} />}>

@@ -295,7 +295,7 @@ export default function Dashboard() {
       </Card>
 
       {/* 3-column layout: Filter | Map | Filter */}
-      <div className="split-layout split-layout-3-col" style={{ marginBottom: 16 }}>
+      <div className="split-layout split-layout-3-col" style={{ marginBottom: 16, height: "calc(100vh - 320px)", minHeight: 360, overflow: "hidden" }}>
         {/* Left: TYPE filter */}
         <HistogramPanel
           title="Incident Type"
@@ -306,9 +306,9 @@ export default function Dashboard() {
         />
 
         {/* Center: Map */}
-        <div style={{ minHeight: 520, height: "100%" }}>
+        <div style={{ height: "100%", overflow: "hidden", borderRadius: 6, border: "1px solid #e1e8ed" }}>
           <MapErrorBoundary>
-            <Suspense fallback={<div style={{ height: 520, display: "flex", alignItems: "center", justifyContent: "center" }}><Spinner /></div>}>
+            <Suspense fallback={<div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><Spinner /></div>}>
               <CrisisMap incidents={filteredIncidents} locations={filteredLocations} />
             </Suspense>
           </MapErrorBoundary>

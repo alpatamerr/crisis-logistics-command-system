@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { Card, Tag, Intent, Spinner, HTMLTable, Callout, Icon, Button, InputGroup } from "@blueprintjs/core";
+import { Card, Tag, Intent, Spinner, HTMLTable, Callout, Icon } from "@blueprintjs/core";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { LineStatus, RoadStatus, BusArrival } from "@crisis-logistics-command-app/sdk";
+import FilterBar, { FilterSection, FilterOption } from "@/components/FilterBar";
 
 export default function TransportStatus() {
   // Filters
@@ -22,7 +23,7 @@ export default function TransportStatus() {
     pageSize: 30,
   });
 
-  // Unique modes for filter pills
+  // Unique modes for filter
   const modes = useMemo(() => {
     const modeSet = new Set<string>();
     (disrupted.data ?? []).forEach(line => {
@@ -77,17 +78,31 @@ export default function TransportStatus() {
     return data;
   }, [roads.data, roadSeverityFilter, roadSearch]);
 
+  const lineActiveFilters = modeFilter ? [{
+    key: "mode",
+    label: modeFilter,
+    intent: Intent.PRIMARY as Intent,
+    onRemove: () => setModeFilter(null),
+  }] : [];
+
+  const roadActiveFilters = roadSeverityFilter ? [{
+    key: "severity",
+    label: roadSeverityFilter,
+    intent: Intent.WARNING as Intent,
+    onRemove: () => setRoadSeverityFilter(null),
+  }] : [];
+
   const hasError = disrupted.error || roads.error || buses.error;
 
   return (
-    <div>
+    <div style={{ paddingBottom: 24 }}>
       {hasError && (
         <Callout intent={Intent.DANGER} title="Data Fetch Error" style={{ marginBottom: 12 }} icon="error">
           Some transport data could not be loaded.
         </Callout>
       )}
 
-      {/* Full-width: Disrupted Lines */}
+      {/* Disrupted Lines */}
       <div className="section-header">
         <h4>
           <Icon icon="train" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
@@ -98,35 +113,26 @@ export default function TransportStatus() {
         </h4>
       </div>
 
-      {/* Mode filter pills + search */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <Button
-          text="All Modes"
-          small
-          minimal={modeFilter !== null}
-          intent={modeFilter === null ? Intent.PRIMARY : Intent.NONE}
-          onClick={() => setModeFilter(null)}
-        />
-        {modes.map(m => (
-          <Button
-            key={m}
-            text={m}
-            small
-            minimal={modeFilter !== m}
-            intent={modeFilter === m ? Intent.PRIMARY : Intent.NONE}
-            onClick={() => setModeFilter(modeFilter === m ? null : m)}
-          />
-        ))}
-        <div style={{ flex: 1 }} />
-        <InputGroup
-          leftIcon="search"
-          placeholder="Search lines..."
-          value={lineSearch}
-          onChange={(e) => setLineSearch(e.target.value)}
-          small
-          style={{ width: 180 }}
-        />
-      </div>
+      <FilterBar
+        search={{
+          value: lineSearch,
+          onChange: setLineSearch,
+          placeholder: "Search lines...",
+        }}
+        activeFilters={lineActiveFilters}
+        onClearAll={() => { setModeFilter(null); setLineSearch(""); }}
+      >
+        <FilterSection title="Transport Mode">
+          {modes.map(m => (
+            <FilterOption
+              key={m}
+              label={m}
+              selected={modeFilter === m}
+              onClick={() => setModeFilter(modeFilter === m ? null : m)}
+            />
+          ))}
+        </FilterSection>
+      </FilterBar>
 
       <Card className="panel-card" style={{ marginBottom: 20 }}>
         {disrupted.isLoading && !disrupted.data && (
@@ -186,36 +192,26 @@ export default function TransportStatus() {
             </h4>
           </div>
 
-          {/* Road filters */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-            <Button
-              text="All"
-              small
-              minimal={roadSeverityFilter !== null}
-              intent={roadSeverityFilter === null ? Intent.PRIMARY : Intent.NONE}
-              onClick={() => setRoadSeverityFilter(null)}
-            />
-            {roadSeverities.map(sev => (
-              <Button
-                key={sev}
-                text={sev}
-                small
-                minimal={roadSeverityFilter !== sev}
-                intent={roadSeverityFilter === sev ? (
-                  sev === "Serious" ? Intent.DANGER : sev === "Good" ? Intent.SUCCESS : Intent.PRIMARY
-                ) : Intent.NONE}
-                onClick={() => setRoadSeverityFilter(roadSeverityFilter === sev ? null : sev)}
-              />
-            ))}
-            <InputGroup
-              leftIcon="search"
-              placeholder="Search roads..."
-              value={roadSearch}
-              onChange={(e) => setRoadSearch(e.target.value)}
-              small
-              style={{ width: 140 }}
-            />
-          </div>
+          <FilterBar
+            search={{
+              value: roadSearch,
+              onChange: setRoadSearch,
+              placeholder: "Search roads...",
+            }}
+            activeFilters={roadActiveFilters}
+            onClearAll={() => { setRoadSeverityFilter(null); setRoadSearch(""); }}
+          >
+            <FilterSection title="Road Severity">
+              {roadSeverities.map(s => (
+                <FilterOption
+                  key={s}
+                  label={s}
+                  selected={roadSeverityFilter === s}
+                  onClick={() => setRoadSeverityFilter(roadSeverityFilter === s ? null : s)}
+                />
+              ))}
+            </FilterSection>
+          </FilterBar>
 
           <Card className="panel-card">
             {roads.isLoading && !roads.data && (

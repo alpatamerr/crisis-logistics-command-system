@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
-import { Card, Spinner, HTMLTable, Tag, Intent, Callout, Icon, InputGroup, Button } from "@blueprintjs/core";
+import { Card, Spinner, HTMLTable, Tag, Intent, Callout, Icon } from "@blueprintjs/core";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useOsdkObjects } from "@osdk/react/experimental";
 import { TravelTime, JourneyPlan, AirQuality, IncidentTrend, PeakHourHeatmap, TransportHotspot, LiveLocation } from "@crisis-logistics-command-app/sdk";
+import Pagination from "@/components/Pagination";
+import FilterBar, { FilterSection, FilterOption } from "@/components/FilterBar";
 
 type SortDir = "asc" | "desc";
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 25;
+const ANALYTICS_PAGE_SIZE = 10;
 
 // ─── Loading Skeleton ───
 function Skeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
@@ -112,11 +115,13 @@ export default function Analytics() {
   const [jpSort, setJpSort] = useState<SortDir>("asc");
   const [hubSearch, setHubSearch] = useState("");
   const [modeFilter, setModeFilter] = useState<string | null>(null);
-  const [ttVisible, setTtVisible] = useState(PAGE_SIZE);
-  const [jpVisible, setJpVisible] = useState(PAGE_SIZE);
-  const [trendsVisible, setTrendsVisible] = useState(10);
-  const [peakVisible, setPeakVisible] = useState(10);
-  const [hotspotsVisible, setHotspotsVisible] = useState(10);
+  const [ttPage, setTtPage] = useState(1);
+  const [ttPageSize, setTtPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [jpPage, setJpPage] = useState(1);
+  const [jpPageSize, setJpPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [trendsPage, setTrendsPage] = useState(1);
+  const [peakPage, setPeakPage] = useState(1);
+  const [hotspotsPage, setHotspotsPage] = useState(1);
 
   const travelTimes = useOsdkObjects(TravelTime, {
     orderBy: { travelTimeSeconds: "asc" },
@@ -183,6 +188,25 @@ export default function Analytics() {
     });
     return data;
   }, [journeyPlans.data, jpSort, modeFilter]);
+
+  // Pagination calculations
+  const ttTotalPages = Math.ceil(sortedTravelTimes.length / ttPageSize);
+  const ttSlice = sortedTravelTimes.slice((ttPage - 1) * ttPageSize, ttPage * ttPageSize);
+
+  const jpTotalPages = Math.ceil(sortedJourneyPlans.length / jpPageSize);
+  const jpSlice = sortedJourneyPlans.slice((jpPage - 1) * jpPageSize, jpPage * jpPageSize);
+
+  const trendsData = incidentTrends.data ?? [];
+  const trendsTotalPages = Math.ceil(trendsData.length / ANALYTICS_PAGE_SIZE);
+  const trendsSlice = trendsData.slice((trendsPage - 1) * ANALYTICS_PAGE_SIZE, trendsPage * ANALYTICS_PAGE_SIZE);
+
+  const peakData = peakHours.data ?? [];
+  const peakTotalPages = Math.ceil(peakData.length / ANALYTICS_PAGE_SIZE);
+  const peakSlice = peakData.slice((peakPage - 1) * ANALYTICS_PAGE_SIZE, peakPage * ANALYTICS_PAGE_SIZE);
+
+  const hotspotsData = hotspots.data ?? [];
+  const hotspotsTotalPages = Math.ceil(hotspotsData.length / ANALYTICS_PAGE_SIZE);
+  const hotspotsSlice = hotspotsData.slice((hotspotsPage - 1) * ANALYTICS_PAGE_SIZE, hotspotsPage * ANALYTICS_PAGE_SIZE);
 
   // Chart data: aggregate by date for line chart
   const trendChartData = useMemo(() => {
@@ -280,15 +304,19 @@ export default function Analytics() {
             <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{sortedTravelTimes.length}</Tag>
           )}
         </h4>
-        <InputGroup
-          leftIcon="search"
-          placeholder="Search hubs..."
-          value={hubSearch}
-          onChange={(e) => setHubSearch(e.target.value)}
-          small
-          style={{ width: 180 }}
-        />
       </div>
+      <FilterBar
+        search={{
+          value: hubSearch,
+          onChange: (v) => { setHubSearch(v); setTtPage(1); },
+          placeholder: "Search hubs...",
+        }}
+        activeFilters={[]}
+      >
+        <div style={{ padding: "12px 14px", fontSize: 12, color: "#738694" }}>
+          Use the search bar to filter by hub name.
+        </div>
+      </FilterBar>
       <Card className="panel-card" style={{ marginBottom: 20 }}>
         {travelTimes.isLoading && !travelTimes.data && (
           <Skeleton />
@@ -315,7 +343,7 @@ export default function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {sortedTravelTimes.slice(0, ttVisible).map((tt) => (
+              {ttSlice.map((tt) => (
                 <tr key={tt.pairId}>
                   <td><strong>{tt.hubName ?? "—"}</strong></td>
                   <td style={{ fontSize: 12, fontFamily: "monospace" }}>{tt.ttIncidentId ?? "—"}</td>
@@ -330,11 +358,14 @@ export default function Analytics() {
             </tbody>
           </HTMLTable>
         )}
-        {sortedTravelTimes.length > ttVisible && (
-          <div style={{ textAlign: "center", padding: 8 }}>
-            <Button small minimal text={`Load More (${sortedTravelTimes.length - ttVisible} remaining)`} onClick={() => setTtVisible(v => v + PAGE_SIZE)} />
-          </div>
-        )}
+        <Pagination
+          currentPage={ttPage}
+          totalPages={ttTotalPages}
+          onPageChange={setTtPage}
+          pageSize={ttPageSize}
+          onPageSizeChange={(size) => { setTtPageSize(size); setTtPage(1); }}
+          totalItems={sortedTravelTimes.length}
+        />
       </Card>
 
       {/* Bottom: Journey Plans */}
@@ -347,27 +378,29 @@ export default function Analytics() {
           )}
         </h4>
       </div>
-      {/* Mode filter pills */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-        <Button
-          text="All Modes"
-          small
-          minimal={modeFilter !== null}
-          intent={modeFilter === null ? Intent.PRIMARY : Intent.NONE}
-          onClick={() => setModeFilter(null)}
-        />
-        {journeyModes.map(m => (
-          <Button
-            key={m}
-            text={m}
-            small
-            minimal={modeFilter !== m}
-            intent={modeFilter === m ? Intent.PRIMARY : Intent.NONE}
-            onClick={() => setModeFilter(modeFilter === m ? null : m)}
-          />
-        ))}
-      </div>
-      <Card className="panel-card">
+
+      <FilterBar
+        activeFilters={modeFilter ? [{
+          key: "mode",
+          label: modeFilter,
+          intent: Intent.PRIMARY,
+          onRemove: () => { setModeFilter(null); setJpPage(1); },
+        }] : []}
+        onClearAll={() => { setModeFilter(null); setJpPage(1); }}
+      >
+        <FilterSection title="Transport Mode">
+          {journeyModes.map(m => (
+            <FilterOption
+              key={m}
+              label={m}
+              selected={modeFilter === m}
+              onClick={() => { setModeFilter(modeFilter === m ? null : m); setJpPage(1); }}
+            />
+          ))}
+        </FilterSection>
+      </FilterBar>
+
+      <Card className="panel-card" style={{ marginBottom: 20 }}>
         {journeyPlans.isLoading && !journeyPlans.data && (
           <Skeleton />
         )}
@@ -394,7 +427,7 @@ export default function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {sortedJourneyPlans.slice(0, jpVisible).map((jp) => (
+              {jpSlice.map((jp) => (
                 <tr key={jp.journeyId}>
                   <td><strong>{jp.originName ?? "—"}</strong></td>
                   <td><strong>{jp.destinationName ?? "—"}</strong></td>
@@ -412,11 +445,14 @@ export default function Analytics() {
             </tbody>
           </HTMLTable>
         )}
-        {sortedJourneyPlans.length > jpVisible && (
-          <div style={{ textAlign: "center", padding: 8 }}>
-            <Button small minimal text={`Load More (${sortedJourneyPlans.length - jpVisible} remaining)`} onClick={() => setJpVisible(v => v + PAGE_SIZE)} />
-          </div>
-        )}
+        <Pagination
+          currentPage={jpPage}
+          totalPages={jpTotalPages}
+          onPageChange={setJpPage}
+          pageSize={jpPageSize}
+          onPageSizeChange={(size) => { setJpPageSize(size); setJpPage(1); }}
+          totalItems={sortedJourneyPlans.length}
+        />
       </Card>
 
       {/* ═══ PYSPARK ANALYTICS ═══ */}
@@ -455,7 +491,7 @@ export default function Analytics() {
           <Icon icon="trending-up" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
           Incident Trends
           {!incidentTrends.isLoading && (
-            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(incidentTrends.data ?? []).length}</Tag>
+            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{trendsData.length}</Tag>
           )}
         </h4>
       </div>
@@ -463,7 +499,7 @@ export default function Analytics() {
         {incidentTrends.isLoading && !incidentTrends.data && (
           <Skeleton />
         )}
-        {(incidentTrends.data ?? []).length > 0 && (
+        {trendsData.length > 0 && (
           <HTMLTable bordered striped style={{ width: "100%" }}>
             <thead>
               <tr>
@@ -475,7 +511,7 @@ export default function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {(incidentTrends.data ?? []).slice(0, trendsVisible).map((t) => (
+              {trendsSlice.map((t) => (
                 <tr key={t.trendId}>
                   <td style={{ fontFamily: "monospace", fontSize: 12 }}>{t.incidentDate ?? "—"}</td>
                   <td>
@@ -499,11 +535,7 @@ export default function Analytics() {
             </tbody>
           </HTMLTable>
         )}
-        {(incidentTrends.data ?? []).length > trendsVisible && (
-          <div style={{ textAlign: "center", padding: 8 }}>
-            <Button small minimal text={`Load More (${(incidentTrends.data ?? []).length - trendsVisible} remaining)`} onClick={() => setTrendsVisible(v => v + PAGE_SIZE)} />
-          </div>
-        )}
+        <Pagination currentPage={trendsPage} totalPages={trendsTotalPages} onPageChange={setTrendsPage} />
       </Card>
 
       {/* Peak Hours Bar Chart */}
@@ -531,7 +563,7 @@ export default function Analytics() {
           <Icon icon="heat-grid" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
           Peak Disruption Hours
           {!peakHours.isLoading && (
-            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(peakHours.data ?? []).length}</Tag>
+            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{peakData.length}</Tag>
           )}
         </h4>
       </div>
@@ -539,7 +571,7 @@ export default function Analytics() {
         {peakHours.isLoading && !peakHours.data && (
           <Skeleton />
         )}
-        {(peakHours.data ?? []).length > 0 && (
+        {peakData.length > 0 && (
           <HTMLTable bordered striped style={{ width: "100%" }}>
             <thead>
               <tr>
@@ -550,7 +582,7 @@ export default function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {(peakHours.data ?? []).slice(0, peakVisible).map((ph) => (
+              {peakSlice.map((ph) => (
                 <tr key={ph.heatmapId}>
                   <td><strong>{ph.dayName ?? "—"}</strong></td>
                   <td style={{ fontFamily: "monospace" }}>{ph.hourOfDay != null ? `${String(ph.hourOfDay).padStart(2, "0")}:00` : "—"}</td>
@@ -569,15 +601,11 @@ export default function Analytics() {
             </tbody>
           </HTMLTable>
         )}
-        {(peakHours.data ?? []).length > peakVisible && (
-          <div style={{ textAlign: "center", padding: 8 }}>
-            <Button small minimal text={`Load More (${(peakHours.data ?? []).length - peakVisible} remaining)`} onClick={() => setPeakVisible(v => v + PAGE_SIZE)} />
-          </div>
-        )}
+        <Pagination currentPage={peakPage} totalPages={peakTotalPages} onPageChange={setPeakPage} />
       </Card>
 
       {/* Transport Hotspots Chart */}
-      {(hotspots.data ?? []).length > 0 && (
+      {hotspotsData.length > 0 && (
         <Card className="panel-card" style={{ marginBottom: 20, padding: 16 }}>
           <h4 style={{ margin: "0 0 12px 0", fontSize: 13 }}>
             <Icon icon="map-marker" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
@@ -585,7 +613,7 @@ export default function Analytics() {
           </h4>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart
-              data={(hotspots.data ?? []).slice(0, 10).map(hs => ({
+              data={hotspotsData.slice(0, 10).map(hs => ({
                 name: findNearestLocation(hs.gridLat, hs.gridLng, locations.data ?? []).slice(0, 20),
                 score: Number(hs.weightedSeverityScore ?? 0),
                 incidents: Number(hs.totalIncidents ?? 0),
@@ -609,7 +637,7 @@ export default function Analytics() {
           <Icon icon="map-marker" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
           Transport Hotspots
           {!hotspots.isLoading && (
-            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{(hotspots.data ?? []).length}</Tag>
+            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{hotspotsData.length}</Tag>
           )}
         </h4>
       </div>
@@ -617,7 +645,7 @@ export default function Analytics() {
         {hotspots.isLoading && !hotspots.data && (
           <Skeleton />
         )}
-        {(hotspots.data ?? []).length > 0 && (
+        {hotspotsData.length > 0 && (
           <HTMLTable bordered striped style={{ width: "100%" }}>
             <thead>
               <tr>
@@ -630,7 +658,7 @@ export default function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {(hotspots.data ?? []).slice(0, hotspotsVisible).map((hs) => (
+              {hotspotsSlice.map((hs) => (
                 <tr key={hs.gridCell}>
                   <td>
                     <Tag
@@ -653,11 +681,7 @@ export default function Analytics() {
             </tbody>
           </HTMLTable>
         )}
-        {(hotspots.data ?? []).length > hotspotsVisible && (
-          <div style={{ textAlign: "center", padding: 8 }}>
-            <Button small minimal text={`Load More (${(hotspots.data ?? []).length - hotspotsVisible} remaining)`} onClick={() => setHotspotsVisible(v => v + 10)} />
-          </div>
-        )}
+        <Pagination currentPage={hotspotsPage} totalPages={hotspotsTotalPages} onPageChange={setHotspotsPage} />
       </Card>
     </div>
   );

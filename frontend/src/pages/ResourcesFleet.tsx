@@ -1,16 +1,15 @@
 import { useState, useMemo, useCallback } from "react";
 import {
   Card, Tag, Intent, Spinner, HTMLTable, Button, Callout, Icon,
-  NumericInput, Dialog, DialogBody, DialogFooter, FormGroup, Switch, HTMLSelect,
+  NumericInput, Dialog, DialogBody, DialogFooter, FormGroup, HTMLSelect,
   OverlayToaster, Position
 } from "@blueprintjs/core";
 
 const toaster = OverlayToaster.createAsync({ position: Position.TOP });
 import { useOsdkObjects, useOsdkAction } from "@osdk/react/experimental";
 import { CrisisResource, LiveTransportUnit, LiveLocation, $Actions } from "@crisis-logistics-command-app/sdk";
-
-type SortDir = "asc" | "desc";
-const FLEET_PAGE_SIZE = 25;
+import Pagination from "@/components/Pagination";
+import FilterBar, { FilterSection, FilterOption, FilterToggle } from "@/components/FilterBar";
 
 export default function ResourcesFleet() {
   // ─── Resources State ───
@@ -27,11 +26,12 @@ export default function ResourcesFleet() {
   // Resource filters
   const [resourceTypeFilter, setResourceTypeFilter] = useState<string | null>(null);
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
-  const [quantitySort, setQuantitySort] = useState<SortDir | null>(null);
+  const [quantitySort, setQuantitySort] = useState<"asc" | "desc" | null>(null);
 
   // ─── Fleet State ───
   const [vehicleFilter, setVehicleFilter] = useState<string | null>(null);
-  const [fleetVisible, setFleetVisible] = useState(FLEET_PAGE_SIZE);
+  const [fleetPage, setFleetPage] = useState(1);
+  const [fleetPageSize, setFleetPageSize] = useState(25);
 
   // ─── Data Fetching ───
   const resources = useOsdkObjects(CrisisResource, { pageSize: 100 });
@@ -91,8 +91,8 @@ export default function ResourcesFleet() {
     return all.filter(u => u.vehicleType === vehicleFilter);
   }, [units.data, vehicleFilter]);
 
-  const visibleUnits = filteredUnits.slice(0, fleetVisible);
-  const hasMoreUnits = fleetVisible < filteredUnits.length;
+  const fleetTotalPages = Math.ceil(filteredUnits.length / fleetPageSize);
+  const visibleUnits = filteredUnits.slice((fleetPage - 1) * fleetPageSize, fleetPage * fleetPageSize);
 
   // ─── Handlers ───
   const handleCreate = useCallback(async () => {
@@ -152,6 +152,29 @@ export default function ResourcesFleet() {
 
   const hasError = resources.error || units.error;
 
+  // Active filter chips
+  const resourceActiveFilters = [
+    ...(resourceTypeFilter ? [{
+      key: "type",
+      label: resourceTypeFilter.replace(/_/g, " "),
+      intent: Intent.PRIMARY as Intent,
+      onRemove: () => setResourceTypeFilter(null),
+    }] : []),
+    ...(showLowStockOnly ? [{
+      key: "lowstock",
+      label: "Low Stock",
+      intent: Intent.WARNING as Intent,
+      onRemove: () => setShowLowStockOnly(false),
+    }] : []),
+  ];
+
+  const fleetActiveFilters = vehicleFilter ? [{
+    key: "vehicle",
+    label: vehicleFilter,
+    intent: Intent.PRIMARY as Intent,
+    onRemove: () => { setVehicleFilter(null); setFleetPage(1); },
+  }] : [];
+
   return (
     <div>
       {hasError && (
@@ -179,33 +202,28 @@ export default function ResourcesFleet() {
         />
       </div>
 
-      {/* Resource Filters */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <Button
-          text="All Types"
-          small
-          minimal={resourceTypeFilter !== null}
-          intent={resourceTypeFilter === null ? Intent.PRIMARY : Intent.NONE}
-          onClick={() => setResourceTypeFilter(null)}
-        />
-        {resourceTypes.map(rt => (
-          <Button
-            key={rt}
-            text={rt}
-            small
-            minimal={resourceTypeFilter !== rt}
-            intent={resourceTypeFilter === rt ? Intent.PRIMARY : Intent.NONE}
-            onClick={() => setResourceTypeFilter(resourceTypeFilter === rt ? null : rt)}
+      <FilterBar
+        activeFilters={resourceActiveFilters}
+        onClearAll={() => { setResourceTypeFilter(null); setShowLowStockOnly(false); }}
+      >
+        <FilterSection title="Resource Type">
+          {resourceTypes.map(t => (
+            <FilterOption
+              key={t}
+              label={t.replace(/_/g, " ")}
+              selected={resourceTypeFilter === t}
+              onClick={() => setResourceTypeFilter(resourceTypeFilter === t ? null : t)}
+            />
+          ))}
+        </FilterSection>
+        <FilterSection title="Status">
+          <FilterToggle
+            label="Low Stock Only"
+            checked={showLowStockOnly}
+            onChange={setShowLowStockOnly}
           />
-        ))}
-        <div style={{ width: 1, height: 16, background: "#d8e1e8" }} />
-        <Switch
-          checked={showLowStockOnly}
-          onChange={() => setShowLowStockOnly(!showLowStockOnly)}
-          label="Low Stock Only"
-          style={{ marginBottom: 0, fontSize: 12 }}
-        />
-      </div>
+        </FilterSection>
+      </FilterBar>
 
       <Card className="panel-card" style={{ marginBottom: 24 }}>
         {/* Inline Create Form */}
@@ -377,26 +395,21 @@ export default function ResourcesFleet() {
         </h4>
       </div>
 
-      {/* Vehicle Type Filter Pills */}
-      <div className="filter-pills" style={{ marginBottom: 12 }}>
-        <Button
-          text="All"
-          small
-          minimal={vehicleFilter !== null}
-          intent={vehicleFilter === null ? Intent.PRIMARY : Intent.NONE}
-          onClick={() => { setVehicleFilter(null); setFleetVisible(FLEET_PAGE_SIZE); }}
-        />
-        {vehicleTypes.map((vt) => (
-          <Button
-            key={vt}
-            text={vt}
-            small
-            minimal={vehicleFilter !== vt}
-            intent={vehicleFilter === vt ? Intent.PRIMARY : Intent.NONE}
-            onClick={() => { setVehicleFilter(vt); setFleetVisible(FLEET_PAGE_SIZE); }}
-          />
-        ))}
-      </div>
+      <FilterBar
+        activeFilters={fleetActiveFilters}
+        onClearAll={() => { setVehicleFilter(null); setFleetPage(1); }}
+      >
+        <FilterSection title="Vehicle Type">
+          {vehicleTypes.map(vt => (
+            <FilterOption
+              key={vt}
+              label={vt}
+              selected={vehicleFilter === vt}
+              onClick={() => { setVehicleFilter(vehicleFilter === vt ? null : vt); setFleetPage(1); }}
+            />
+          ))}
+        </FilterSection>
+      </FilterBar>
 
       <Card className="panel-card">
         {units.isLoading && !units.data && (
@@ -445,17 +458,14 @@ export default function ResourcesFleet() {
           </HTMLTable>
         )}
 
-        {hasMoreUnits && (
-          <div style={{ textAlign: "center", padding: 12 }}>
-            <Button
-              text={`Load more (${fleetVisible}/${filteredUnits.length})`}
-              onClick={() => setFleetVisible((prev) => prev + FLEET_PAGE_SIZE)}
-              minimal
-              small
-              intent={Intent.PRIMARY}
-            />
-          </div>
-        )}
+        <Pagination
+          currentPage={fleetPage}
+          totalPages={fleetTotalPages}
+          onPageChange={setFleetPage}
+          pageSize={fleetPageSize}
+          onPageSizeChange={(size) => { setFleetPageSize(size); setFleetPage(1); }}
+          totalItems={filteredUnits.length}
+        />
       </Card>
     </div>
   );
