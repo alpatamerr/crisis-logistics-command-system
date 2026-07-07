@@ -17,11 +17,11 @@ A full-stack real-time crisis logistics platform for West London, built on **Pal
 
 ## 🎥 Demo
 
-https://github.com/user-attachments/assets/22c3f15b-8492-4c89-962b-be558b921cac
+https://github.com/user-attachments/assets/f7e2dc35-7809-4152-a712-232b144a301f
 
 > **2-minute walkthrough** covering real-time incident monitoring, interactive map filtering, transport disruption tracking, CRUD resource management, and PySpark-powered analytics.
 
-[![Watch in HD on YouTube](https://img.shields.io/badge/▶_Watch_in_HD-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/MVy97B0wrdg)
+[![Watch in HD on YouTube](https://img.shields.io/badge/▶_Watch_in_HD-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/GIf3iSV59ms)
 
 ## 🏗️ Architecture
 
