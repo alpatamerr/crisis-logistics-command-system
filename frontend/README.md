@@ -191,8 +191,6 @@ https://*.basemaps.cartocdn.com
 
 ## 🛠️ Key Technical Decisions
 
-## 🛠️ Key Technical Decisions
-
 1. **`@osdk/react` experimental hooks** (`useOsdkObjects`, `useOsdkAction`) — provides reactive data fetching with automatic caching
 2. **Leaflet over Google Maps** — Google Maps blocked by CSP `script-src 'self'`; Leaflet works with `img-src` CSP for tile loading
 3. **Client-side filtering and sorting** — all data loaded via OSDK, then filtered/sorted in-memory for instant UI response
