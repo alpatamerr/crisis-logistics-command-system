@@ -4,14 +4,13 @@ A full-stack real-time crisis logistics platform for West London, built on **Pal
 
 > ⚠️ **Note:** This system runs on [Palantir Foundry](https://www.palantir.com/platforms/foundry/) and requires a Foundry instance with the configured Ontology. Source code is provided for portfolio/review purposes.
 
-> 💼 **Context:** Built as a freelance project for a client needing real-time visibility into
-> West London transport disruptions and incidents to coordinate field response and resource allocation.
+> 💼 **Context:** Built as a prototype to pitch for contract work — real-time visibility into West London transport disruptions and incidents to coordinate field response and resource allocation. Designed around realistic operational personas (ops manager, dispatcher, resource officer, shift supervisor).
 
 ## 📁 Repository Structure
 
 | Directory | Stack | Description |
 |-----------|-------|-------------|
-| [`frontend/`](./frontend) | React 19, TypeScript 6, Vite 8, OSDK, Leaflet, BlueprintJS | Operational dashboard with 5 tabs, interactive map, filters, and CRUD actions |
+| [`frontend/`](./frontend) | React 19, TypeScript 6, Vite 8, OSDK, Leaflet, BlueprintJS | Operational dashboard with 5 tabs, role-based access, interactive map, filters, and CRUD actions |
 | [`pipelines/`](./pipelines) | Python, PySpark, Foundry Transforms, REST APIs | Data ingestion + PySpark analytics (TfL, Google Maps, Airlabs, Air Quality APIs) |
 | [`functions/`](./functions) | TypeScript v2, Foundry Functions | Server-side business logic and ontology edit functions |
 
@@ -19,7 +18,7 @@ A full-stack real-time crisis logistics platform for West London, built on **Pal
 
 https://github.com/user-attachments/assets/f7e2dc35-7809-4152-a712-232b144a301f
 
-> **2-minute walkthrough** covering real-time incident monitoring, interactive map filtering, transport disruption tracking, CRUD resource management, and PySpark-powered analytics.
+> **2-minute walkthrough** covering real-time incident monitoring, anomaly detection, transport disruption tracking, CRUD resource management, predictive forecasting, and role-based access.
 
 [![Watch in HD on YouTube](https://img.shields.io/badge/▶_Watch_in_HD-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/GIf3iSV59ms)
 
@@ -36,12 +35,12 @@ flowchart TB
 
     subgraph Pipelines["📊 Pipelines — Python/PySpark"]
         direction LR
-        P1["Incident\nProcessor"] ~~~ P2["Transport\nProcessors"] ~~~ P3["Location\nDiscovery"] ~~~ P4["PySpark\nAnalytics"]
+        P1["Incident Processor"] ~~~ P2["Transport Processors"] ~~~ P3["Location Discovery"] ~~~ P4["PySpark Analytics"]
     end
 
-    subgraph Ontology["🗄️ Ontology — 13 Object Types"]
+    subgraph Ontology["🗄️ Ontology — 15 Object Types"]
         direction LR
-        O1["LiveIncident\nLiveLocation\nLiveTransportUnit"] ~~~ O2["LineStatus\nRoadStatus\nBusArrival"] ~~~ O3["TravelTime\nJourneyPlan\nAirQuality\nCrisisResource"] ~~~ O4["IncidentTrend\nPeakHourHeatmap\nTransportHotspot"]
+        O1["LiveIncident LiveLocation LiveTransportUnit"] ~~~ O2["LineStatus RoadStatus BusArrival"] ~~~ O3["TravelTime JourneyPlan AirQuality CrisisResource"] ~~~ O4["IncidentTrend PeakHourHeatmap TransportHotspot DisruptionForecast IncidentResponse"]
     end
 
     subgraph Functions["⚙️ TypeScript v2 Functions"]
@@ -50,7 +49,7 @@ flowchart TB
 
     subgraph App["🖥️ React Frontend — OSDK · Leaflet · BlueprintJS"]
         direction LR
-        UI["5-Tab Dashboard"] ~~~ Map["Interactive Map"] ~~~ Actions["CRUD Actions"]
+        UI["5-Tab Dashboard · Role-Based Access"] ~~~ Map["Interactive Map"] ~~~ Actions["CRUD + Response Actions"]
     end
 
     APIs --> DC
@@ -63,7 +62,7 @@ flowchart TB
 
 ## 📊 Data Pipeline (`pipelines/`)
 
-21 Python transforms — 17 data ingestion + 4 PySpark analytics:
+22 Python transforms — 17 data ingestion + 5 PySpark analytics:
 
 | Transform | Source | Output |
 |-----------|--------|--------|
@@ -88,32 +87,32 @@ flowchart TB
 | ⚡ `peak_hour_heatmap` | PySpark on raw_live_incidents | Hour × day disruption matrix |
 | ⚡ `transport_reliability` | PySpark on raw_live_incidents | Geographic hotspot detection |
 | ⚡ `anomaly_detection` | PySpark on raw_live_incidents | Z-score anomaly detection (SPIKE/DROP/NORMAL) |
+| ⚡ `disruption_forecast` | PySpark on raw_live_incidents | Predicted high-risk windows (day × hour × zone) |
 
-
-All API keys are stored securely in Foundry's secret vault — no hardcoded credentials.
+Data quality is enforced with Foundry Expectations (primary-key uniqueness, null checks) and unit tests. All API keys are stored securely in Foundry's secret vault — no hardcoded credentials.
 
 ## 🖥️ Frontend (`frontend/`)
 
-React 19 operational dashboard with 5 tabs:
+React 19 operational dashboard with **role-based tab visibility** (All Access, Ops Manager, Dispatcher, Resource Officer, Shift Supervisor) and 5 tabs:
 
-1. **Situation Overview** — Interactive Leaflet map with severity markers, histogram filters, time range
-2. **Active Incidents** — Master-detail table with severity/type filters, mini-map flyTo, CSV export
+1. **Situation Overview** — Interactive Leaflet map with severity markers, histogram filters, time range, anomaly alert banner, and low-stock alert banner
+2. **Active Incidents** — Master-detail table with severity/type filters, mini-map flyTo, CSV export, and incident response workflow (acknowledge / reroute / escalate) with full response history
 3. **Transport Status** — Disrupted lines, road conditions, bus arrivals with mode filters
-4. **Resources & Fleet** — CRUD resource management via OSDK Actions, fleet monitoring, toast notifications
-5. **Analytics** — Travel times, journey plans, air quality metrics + ⚡ PySpark-powered charts (line, bar, horizontal bar)
+4. **Resources & Fleet** — CRUD resource management via OSDK Actions, threshold alerts, fleet monitoring, toast notifications
+5. **Analytics** — Travel times + ⚡ PySpark-powered intelligence: weekly disruption forecast, incident trends, peak disruption hours, geographic hotspots (line, bar, horizontal bar charts)
 
 **Tech:** React 19 · TypeScript 6 · Vite 8 · BlueprintJS 6 · Leaflet · Recharts · @osdk/react
 
-**Features:** Auto-refresh (15min countdown) · CSV export · Browser notifications for severe incidents · Loading skeletons · Toast notifications · Per-section error boundaries · Live pulse indicator
-
+**Features:** Role-based access · Anomaly detection · Predictive forecasting · Auto-refresh (15min countdown) · CSV export · Browser notifications · Loading skeletons · Toast notifications · Per-section error boundaries · Live pulse indicator · Numbered pagination with page-size control · "Add filters" popover
 
 ## ⚙️ Functions (`functions/`)
 
-TypeScript v2 Foundry Functions providing server-side logic for:
-- Ontology edit functions backing Action Types
-- Data validation and business rules
+TypeScript v2 Foundry Functions providing server-side logic:
+- `isBelowThreshold` — flags resources below their critical threshold
+- `countLowResources` — counts resources needing restock
+- Function-backed columns for at-a-glance operational status
 
-## 🗄️ Ontology (13 Object Types)
+## 🗄️ Ontology (15 Object Types)
 
 | Object Type | Description |
 |-------------|-------------|
@@ -130,7 +129,9 @@ TypeScript v2 Foundry Functions providing server-side logic for:
 | ⚡ IncidentTrend | Daily incident trends with 7-day rolling averages |
 | ⚡ PeakHourHeatmap | Hour × day-of-week disruption frequency matrix |
 | ⚡ TransportHotspot | Geographic hotspot detection with severity scoring |
+| ⚡ DisruptionForecast | Predicted high-risk windows by day, hour, and zone |
+| IncidentResponse | Operational response audit trail (acknowledge / reroute / escalate) |
 
 ## 📝 License
 
-Proprietary, built for a private client; shared here for portfolio/demonstration purposes.
+Portfolio/demonstration project. Source shared for review purposes.
