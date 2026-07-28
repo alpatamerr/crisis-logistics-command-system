@@ -1,8 +1,10 @@
 import { lazy, Suspense, useState, useMemo } from "react";
-import { Card, Tag, Intent, Spinner, HTMLTable, Callout, Icon } from "@blueprintjs/core";
+import { Card, Tag, Intent, Spinner, HTMLTable, Callout, Icon, Button, Dialog, DialogBody, DialogFooter, FormGroup, HTMLSelect, TextArea, OverlayToaster, Position } from "@blueprintjs/core";
 import { exportToCsv } from "../utils/csvExport";
-import { useOsdkObjects } from "@osdk/react/experimental";
-import { LiveIncident } from "@crisis-logistics-command-app/sdk";
+import { useOsdkObjects, useOsdkAction } from "@osdk/react/experimental";
+import { LiveIncident, IncidentResponse, $Actions } from "@crisis-logistics-command-app/sdk";
+
+const toaster = OverlayToaster.createAsync({ position: Position.TOP });
 import Pagination from "@/components/Pagination";
 import FilterBar, { FilterSection, FilterOption } from "@/components/FilterBar";
 
@@ -41,10 +43,67 @@ export default function ActiveIncidents() {
   const [sortField, setSortField] = useState<SortField>("severity");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
+  // Respond to Incident
+  const [respondTarget, setRespondTarget] = useState<typeof selected>(null);
+  const [respondAction, setRespondAction] = useState("acknowledged");
+  const [respondNotes, setRespondNotes] = useState("");
+  const [responding, setResponding] = useState(false);
+  const respondToIncident = useOsdkAction($Actions.respondToIncident);
+
+  const handleRespond = async () => {
+    if (!respondTarget) { return; }
+    setResponding(true);
+    try {
+      await respondToIncident.applyAction({
+        incident: respondTarget,
+        responseAction: respondAction,
+        responseNotes: respondNotes || undefined,
+      });
+      (await toaster).show({ message: `✓ ${respondAction} — ${respondTarget.incidentId}`, intent: Intent.SUCCESS, timeout: 3000 });
+      setRespondTarget(null);
+      setRespondAction("acknowledged");
+      setRespondNotes("");
+    } catch {
+      (await toaster).show({ message: "Failed to record response", intent: Intent.DANGER, timeout: 3000 });
+    } finally {
+      setResponding(false);
+    }
+  };
+
   const incidents = useOsdkObjects(LiveIncident, {
     orderBy: { severityLevel: "asc" },
     pageSize: 200,
   });
+
+  // All incident responses (user's own actions).
+  // Filter incidentId not null to exclude ghost rows from a shared backing dataset.
+  const responses = useOsdkObjects(IncidentResponse, {
+    where: { incidentId: { $isNull: false } },
+    pageSize: 500,
+  });
+
+  // Count of responses per incident ID
+  const responseCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    (responses.data ?? []).forEach(r => {
+      if (r.incidentId) {
+        counts.set(r.incidentId, (counts.get(r.incidentId) ?? 0) + 1);
+      }
+    });
+    return counts;
+  }, [responses.data]);
+
+  // Responses for the selected incident, most recent first
+  const selectedResponses = useMemo(() => {
+    if (!selectedId) { return []; }
+    return (responses.data ?? [])
+      .filter(r => r.incidentId === selectedId)
+      .sort((a, b) => {
+        const ta = a.respondedAt ? new Date(a.respondedAt).getTime() : 0;
+        const tb = b.respondedAt ? new Date(b.respondedAt).getTime() : 0;
+        return tb - ta;
+      });
+  }, [responses.data, selectedId]);
 
   const incidentTypes = useMemo(() => {
     const types = new Set<string>();
@@ -229,7 +288,14 @@ export default function ActiveIncidents() {
                       {inc.severityLevel ?? "Unknown"}
                     </Tag>
                   </td>
-                  <td style={{ fontSize: 12 }}>{inc.incidentType ?? "—"}</td>
+                  <td style={{ fontSize: 12 }}>
+                    {inc.incidentType ?? "—"}
+                    {(responseCounts.get(inc.incidentId) ?? 0) > 0 && (
+                      <Tag minimal intent={Intent.SUCCESS} style={{ marginLeft: 6, fontSize: 10 }} icon="confirm">
+                        {responseCounts.get(inc.incidentId)}
+                      </Tag>
+                    )}
+                  </td>
                   <td style={{ fontSize: 11, color: "#738694", whiteSpace: "nowrap" }}>
                     {inc.polledAt != null ? new Date(inc.polledAt).toLocaleDateString() : "—"}
                   </td>
@@ -296,6 +362,76 @@ export default function ActiveIncidents() {
               <div className="detail-description">{selected.description}</div>
             )}
 
+            {/* Respond Actions */}
+            <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
+              <Button
+                small
+                intent={Intent.SUCCESS}
+                icon="confirm"
+                text="Acknowledge"
+                onClick={() => { setRespondTarget(selected); setRespondAction("acknowledged"); }}
+              />
+              <Button
+                small
+                intent={Intent.WARNING}
+                icon="refresh"
+                text="Rerouted"
+                onClick={() => { setRespondTarget(selected); setRespondAction("rerouted"); }}
+              />
+              <Button
+                small
+                intent={Intent.DANGER}
+                icon="arrow-up"
+                text="Escalate"
+                onClick={() => { setRespondTarget(selected); setRespondAction("escalated"); }}
+              />
+            </div>
+
+            {/* Response History */}
+            {selectedResponses.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#5c7080", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+                  <Icon icon="history" size={12} style={{ marginRight: 6, opacity: 0.6 }} />
+                  Response History ({selectedResponses.length})
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {selectedResponses.map((r) => (
+                    <div
+                      key={r.responseId}
+                      style={{
+                        padding: "8px 12px",
+                        background: "#f5f8fa",
+                        borderRadius: 6,
+                        borderLeft: `3px solid ${
+                          r.responseAction === "escalated" ? "#c23030" :
+                          r.responseAction === "rerouted" ? "#d9822b" : "#0f9960"
+                        }`,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <Tag
+                          minimal
+                          intent={
+                            r.responseAction === "escalated" ? Intent.DANGER :
+                            r.responseAction === "rerouted" ? Intent.WARNING : Intent.SUCCESS
+                          }
+                          style={{ fontSize: 11, fontWeight: 600 }}
+                        >
+                          {r.responseAction === "escalated" ? "⬆" : r.responseAction === "rerouted" ? "↻" : "✓"} {r.responseAction}
+                        </Tag>
+                        <span style={{ fontSize: 10, color: "#a7b6c2" }}>
+                          {r.respondedAt != null ? new Date(r.respondedAt).toLocaleString() : "—"}
+                        </span>
+                      </div>
+                      {r.notes && (
+                        <div style={{ fontSize: 12, color: "#394b59", marginTop: 6 }}>{r.notes}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {selected.latitude != null && selected.longitude != null && (
               <div style={{ marginTop: 16 }}>
                 <Suspense fallback={<Spinner size={20} />}>
@@ -312,6 +448,50 @@ export default function ActiveIncidents() {
           </>
         )}
       </div>
+      {/* Respond to Incident Dialog */}
+      <Dialog
+        isOpen={respondTarget != null}
+        onClose={() => setRespondTarget(null)}
+        title={`${respondAction.charAt(0).toUpperCase() + respondAction.slice(1)} — ${respondTarget?.incidentId ?? ""}`}
+        icon="confirm"
+      >
+        <DialogBody>
+          <FormGroup label="Response Action">
+            <HTMLSelect
+              value={respondAction}
+              onChange={(e) => setRespondAction(e.target.value)}
+              fill
+            >
+              <option value="acknowledged">✓ Acknowledged</option>
+              <option value="rerouted">↻ Rerouted</option>
+              <option value="escalated">⬆ Escalated</option>
+            </HTMLSelect>
+          </FormGroup>
+          <FormGroup label="Notes (optional)">
+            <TextArea
+              value={respondNotes}
+              onChange={(e) => setRespondNotes(e.target.value)}
+              placeholder="e.g. 3 drivers rerouted away from zone"
+              fill
+              rows={3}
+            />
+          </FormGroup>
+        </DialogBody>
+        <DialogFooter
+          actions={
+            <>
+              <Button text="Cancel" onClick={() => setRespondTarget(null)} />
+              <Button
+                text="Submit Response"
+                intent={Intent.SUCCESS}
+                icon="confirm"
+                loading={responding}
+                onClick={handleRespond}
+              />
+            </>
+          }
+        />
+      </Dialog>
     </div>
   );
 }

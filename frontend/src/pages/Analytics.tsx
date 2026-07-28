@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { Card, Spinner, HTMLTable, Tag, Intent, Callout, Icon } from "@blueprintjs/core";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useOsdkObjects } from "@osdk/react/experimental";
-import { TravelTime, JourneyPlan, AirQuality, IncidentTrend, PeakHourHeatmap, TransportHotspot, LiveLocation } from "@crisis-logistics-command-app/sdk";
+import { TravelTime, IncidentTrend, PeakHourHeatmap, TransportHotspot, LiveLocation, DisruptionForecast } from "@crisis-logistics-command-app/sdk";
 import Pagination from "@/components/Pagination";
-import FilterBar, { FilterSection, FilterOption } from "@/components/FilterBar";
+import FilterBar from "@/components/FilterBar";
 
 type SortDir = "asc" | "desc";
 const DEFAULT_PAGE_SIZE = 25;
@@ -35,18 +35,7 @@ function Skeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   );
 }
 
-const MODE_ICONS: Record<string, string> = {
-  walking: "🚶",
-  bus: "🚌",
-  tube: "🚇",
-  overground: "🚆",
-  dlr: "🚈",
-  "national-rail": "🚂",
-  cycle: "🚴",
-  river: "⛴️",
-  tram: "🚊",
-  coach: "🚍",
-};
+
 
 function findNearestLocation(lat: number | null | undefined, lng: number | null | undefined, locs: Array<{ latitude?: number | null; longitude?: number | null; locationName?: string | null }>): string {
   if (lat == null || lng == null || locs.length === 0) {
@@ -67,33 +56,14 @@ function findNearestLocation(lat: number | null | undefined, lng: number | null 
   return nearest.locationName ?? `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
 }
 
-function formatLegsSummary(raw: string | null | undefined): string {
-  if (!raw) {
-    return "—";
-  }
-  return raw
-    .split(">")
-    .map(leg => {
-      const trimmed = leg.trim();
-      const match = trimmed.match(/^(\w[\w-]*)\((\d+)min\)$/);
-      if (match) {
-        const mode = match[1].toLowerCase();
-        const mins = match[2];
-        const icon = MODE_ICONS[mode] ?? "•";
-        const name = mode.charAt(0).toUpperCase() + mode.slice(1);
-        return `${icon} ${name} ${mins} min`;
-      }
-      return trimmed;
-    })
-    .join(" → ");
-}
+
 
 function MetricCard({ title, value, subtitle, intent, icon, loading }: {
   title: string;
   value: string | number;
   subtitle?: string;
   intent: Intent;
-  icon: "cloud" | "time" | "path-search";
+  icon: "cloud" | "time" | "path-search" | "predictive-analysis" | "map-marker";
   loading: boolean;
 }) {
   return (
@@ -112,13 +82,9 @@ function MetricCard({ title, value, subtitle, intent, icon, loading }: {
 
 export default function Analytics() {
   const [ttSort, setTtSort] = useState<SortDir>("asc");
-  const [jpSort, setJpSort] = useState<SortDir>("asc");
   const [hubSearch, setHubSearch] = useState("");
-  const [modeFilter, setModeFilter] = useState<string | null>(null);
   const [ttPage, setTtPage] = useState(1);
   const [ttPageSize, setTtPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [jpPage, setJpPage] = useState(1);
-  const [jpPageSize, setJpPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [trendsPage, setTrendsPage] = useState(1);
   const [peakPage, setPeakPage] = useState(1);
   const [hotspotsPage, setHotspotsPage] = useState(1);
@@ -127,11 +93,7 @@ export default function Analytics() {
     orderBy: { travelTimeSeconds: "asc" },
     pageSize: 50,
   });
-  const journeyPlans = useOsdkObjects(JourneyPlan, {
-    orderBy: { durationMinutes: "asc" },
-    pageSize: 50,
-  });
-  const airQuality = useOsdkObjects(AirQuality, { pageSize: 10 });
+
 
   const locations = useOsdkObjects(LiveLocation, { pageSize: 100 });
 
@@ -139,22 +101,23 @@ export default function Analytics() {
   const incidentTrends = useOsdkObjects(IncidentTrend, { orderBy: { incidentDate: "desc" }, pageSize: 50 });
   const peakHours = useOsdkObjects(PeakHourHeatmap, { orderBy: { incidentCount: "desc" }, pageSize: 50 });
   const hotspots = useOsdkObjects(TransportHotspot, { orderBy: { hotspotRank: "asc" }, pageSize: 20 });
+  const forecasts = useOsdkObjects(DisruptionForecast, { pageSize: 200 });
 
-  // Unique modes from journey plans
-  const journeyModes = useMemo(() => {
-    const modes = new Set<string>();
-    (journeyPlans.data ?? []).forEach(jp => {
-      if (jp.modesUsed) {
-        jp.modesUsed.split(",").forEach(m => {
-          const trimmed = m.trim();
-          if (trimmed) {
-            modes.add(trimmed);
-          }
-        });
-      }
-    });
-    return Array.from(modes).sort();
-  }, [journeyPlans.data]);
+  // Forecast: only HIGH and MEDIUM risk, sorted by risk then avg count
+  const [forecastPage, setForecastPage] = useState(1);
+  const forecastData = useMemo(() => {
+    return (forecasts.data ?? [])
+      .filter(f => f.riskLevel === "HIGH" || f.riskLevel === "MEDIUM")
+      .sort((a, b) => {
+        if (a.riskLevel === "HIGH" && b.riskLevel !== "HIGH") { return -1; }
+        if (a.riskLevel !== "HIGH" && b.riskLevel === "HIGH") { return 1; }
+        return (b.avgIncidentCount ?? 0) - (a.avgIncidentCount ?? 0);
+      });
+  }, [forecasts.data]);
+  const forecastTotalPages = Math.ceil(forecastData.length / ANALYTICS_PAGE_SIZE);
+  const forecastSlice = forecastData.slice((forecastPage - 1) * ANALYTICS_PAGE_SIZE, forecastPage * ANALYTICS_PAGE_SIZE);
+
+
 
   const sortedTravelTimes = useMemo(() => {
     let data = [...(travelTimes.data ?? [])];
@@ -173,28 +136,13 @@ export default function Analytics() {
     return data;
   }, [travelTimes.data, ttSort, hubSearch]);
 
-  const sortedJourneyPlans = useMemo(() => {
-    let data = [...(journeyPlans.data ?? [])];
-    if (modeFilter) {
-      data = data.filter(jp => {
-        const modes = (jp.modesUsed ?? "").toLowerCase();
-        return modes.includes(modeFilter.toLowerCase());
-      });
-    }
-    data.sort((a, b) => {
-      const aVal = Number(a.durationMinutes ?? 0);
-      const bVal = Number(b.durationMinutes ?? 0);
-      return jpSort === "asc" ? aVal - bVal : bVal - aVal;
-    });
-    return data;
-  }, [journeyPlans.data, jpSort, modeFilter]);
+
 
   // Pagination calculations
   const ttTotalPages = Math.ceil(sortedTravelTimes.length / ttPageSize);
   const ttSlice = sortedTravelTimes.slice((ttPage - 1) * ttPageSize, ttPage * ttPageSize);
 
-  const jpTotalPages = Math.ceil(sortedJourneyPlans.length / jpPageSize);
-  const jpSlice = sortedJourneyPlans.slice((jpPage - 1) * jpPageSize, jpPage * jpPageSize);
+
 
   const trendsData = incidentTrends.data ?? [];
   const trendsTotalPages = Math.ceil(trendsData.length / ANALYTICS_PAGE_SIZE);
@@ -241,8 +189,7 @@ export default function Analytics() {
       }));
   }, [peakHours.data]);
 
-  const hasError = travelTimes.error || journeyPlans.error || airQuality.error;
-  const currentAQ = (airQuality.data ?? []).find(aq => aq.forecastType === "Current");
+  const hasError = travelTimes.error;
 
   const avgMinutes = useMemo(() => {
     const all = travelTimes.data ?? [];
@@ -253,7 +200,7 @@ export default function Analytics() {
     return `${Math.round(avgSec / 60)}m`;
   }, [travelTimes.data]);
 
-  const routeCount = journeyPlans.data?.length ?? 0;
+
 
   return (
     <div>
@@ -263,20 +210,8 @@ export default function Analytics() {
         </Callout>
       )}
 
-      {/* Top: 3 Metric Cards */}
+      {/* Top: Metric Cards */}
       <div className="metrics-grid" style={{ marginBottom: 20 }}>
-        <MetricCard
-          title="Air Quality"
-          value={currentAQ?.forecastBand ?? "—"}
-          subtitle={currentAQ?.forecastSummary ?? undefined}
-          intent={
-            currentAQ?.forecastBand === "Low" ? Intent.SUCCESS :
-            currentAQ?.forecastBand === "Moderate" ? Intent.WARNING :
-            currentAQ?.forecastBand === "High" ? Intent.DANGER : Intent.NONE
-          }
-          icon="cloud"
-          loading={airQuality.isLoading}
-        />
         <MetricCard
           title="Avg Travel Time"
           value={avgMinutes}
@@ -286,12 +221,20 @@ export default function Analytics() {
           loading={travelTimes.isLoading}
         />
         <MetricCard
-          title="Routes Calculated"
-          value={routeCount}
-          subtitle="Journey plans available"
-          intent={Intent.NONE}
-          icon="path-search"
-          loading={journeyPlans.isLoading}
+          title="High-Risk Windows"
+          value={forecastData.filter(f => f.riskLevel === "HIGH").length}
+          subtitle="Predicted disruption windows"
+          intent={Intent.DANGER}
+          icon="predictive-analysis"
+          loading={forecasts.isLoading}
+        />
+        <MetricCard
+          title="Hotspot Zones"
+          value={hotspotsData.length}
+          subtitle="Active disruption zones"
+          intent={Intent.WARNING}
+          icon="map-marker"
+          loading={hotspots.isLoading}
         />
       </div>
 
@@ -368,99 +311,73 @@ export default function Analytics() {
         />
       </Card>
 
-      {/* Bottom: Journey Plans */}
-      <div className="section-header">
-        <h4>
-          <Icon icon="path-search" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
-          Journey Plans
-          {!journeyPlans.isLoading && (
-            <Tag minimal style={{ marginLeft: 8, fontSize: 11 }}>{sortedJourneyPlans.length}</Tag>
-          )}
-        </h4>
-      </div>
-
-      <FilterBar
-        activeFilters={modeFilter ? [{
-          key: "mode",
-          label: modeFilter,
-          intent: Intent.PRIMARY,
-          onRemove: () => { setModeFilter(null); setJpPage(1); },
-        }] : []}
-        onClearAll={() => { setModeFilter(null); setJpPage(1); }}
-      >
-        <FilterSection title="Transport Mode">
-          {journeyModes.map(m => (
-            <FilterOption
-              key={m}
-              label={m}
-              selected={modeFilter === m}
-              onClick={() => { setModeFilter(modeFilter === m ? null : m); setJpPage(1); }}
-            />
-          ))}
-        </FilterSection>
-      </FilterBar>
-
-      <Card className="panel-card" style={{ marginBottom: 20 }}>
-        {journeyPlans.isLoading && !journeyPlans.data && (
-          <Skeleton />
-        )}
-        {(journeyPlans.data ?? []).length === 0 && !journeyPlans.isLoading && (
-          <div className="empty-state">
-            <Icon icon="path-search" size={24} />
-            <p>No journey plans available</p>
-          </div>
-        )}
-        {(journeyPlans.data ?? []).length > 0 && (
-          <HTMLTable bordered striped style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th>Origin</th>
-                <th>Destination</th>
-                <th
-                  style={{ cursor: "pointer", userSelect: "none" }}
-                  onClick={() => setJpSort(prev => prev === "asc" ? "desc" : "asc")}
-                >
-                  Duration <Icon icon={jpSort === "asc" ? "sort-asc" : "sort-desc"} size={12} />
-                </th>
-                <th>Modes</th>
-                <th>Route Steps</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jpSlice.map((jp) => (
-                <tr key={jp.journeyId}>
-                  <td><strong>{jp.originName ?? "—"}</strong></td>
-                  <td><strong>{jp.destinationName ?? "—"}</strong></td>
-                  <td>
-                    <Tag minimal intent={Intent.PRIMARY} style={{ fontSize: 11 }}>
-                      {jp.durationMinutes != null ? `${jp.durationMinutes} min` : "—"}
-                    </Tag>
-                  </td>
-                  <td style={{ fontSize: 12 }}>{jp.modesUsed ?? "—"}</td>
-                  <td style={{ maxWidth: 350, fontSize: 12, color: "#738694", lineHeight: 1.4 }}>
-                    {formatLegsSummary(jp.legsSummary)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </HTMLTable>
-        )}
-        <Pagination
-          currentPage={jpPage}
-          totalPages={jpTotalPages}
-          onPageChange={setJpPage}
-          pageSize={jpPageSize}
-          onPageSizeChange={(size) => { setJpPageSize(size); setJpPage(1); }}
-          totalItems={sortedJourneyPlans.length}
-        />
-      </Card>
-
       {/* ═══ PYSPARK ANALYTICS ═══ */}
       <div style={{ marginTop: 24, marginBottom: 12 }}>
         <Tag intent={Intent.WARNING} minimal icon="flash" style={{ fontSize: 11 }}>
           Powered by Apache Spark
         </Tag>
       </div>
+
+      {/* Disruption Forecast — Predictive */}
+      <div className="section-header">
+        <h4>
+          <Icon icon="predictive-analysis" size={14} style={{ marginRight: 6, opacity: 0.6 }} />
+          Weekly Disruption Forecast
+          {!forecasts.isLoading && (
+            <Tag minimal intent={Intent.DANGER} style={{ marginLeft: 8, fontSize: 11 }}>
+              {forecastData.filter(f => f.riskLevel === "HIGH").length} HIGH RISK
+            </Tag>
+          )}
+        </h4>
+      </div>
+      <Card className="panel-card" style={{ marginBottom: 20 }}>
+        {forecasts.isLoading && !forecasts.data && <Skeleton />}
+        {forecastData.length === 0 && !forecasts.isLoading && (
+          <div className="empty-state">
+            <Icon icon="predictive-analysis" size={24} />
+            <p>No high-risk windows detected</p>
+          </div>
+        )}
+        {forecastData.length > 0 && (
+          <HTMLTable bordered striped style={{ width: "100%" }}>
+            <thead>
+              <tr>
+                <th>Risk</th>
+                <th>Day</th>
+                <th>Hour</th>
+                <th>Zone</th>
+                <th>Avg Incidents</th>
+                <th>Max Observed</th>
+                <th>Sample Days</th>
+              </tr>
+            </thead>
+            <tbody>
+              {forecastSlice.map((f) => (
+                <tr key={f.forecastId}>
+                  <td>
+                    <Tag
+                      minimal
+                      intent={f.riskLevel === "HIGH" ? Intent.DANGER : Intent.WARNING}
+                      style={{ fontSize: 11, fontWeight: 600 }}
+                    >
+                      {f.riskLevel === "HIGH" ? "🔴" : "🟡"} {f.riskLevel}
+                    </Tag>
+                  </td>
+                  <td><strong>{f.dayName ?? "—"}</strong></td>
+                  <td style={{ fontFamily: "monospace" }}>
+                    {f.hourBlock != null ? `${String(f.hourBlock).padStart(2, "0")}:00` : "—"}
+                  </td>
+                  <td style={{ fontSize: 12 }}>{f.gridZone ?? "—"}</td>
+                  <td><strong>{f.avgIncidentCount ?? 0}</strong></td>
+                  <td style={{ color: "#c23030" }}>{f.maxIncidentCount ?? 0}</td>
+                  <td style={{ color: "#738694" }}>{f.sampleDays ?? 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </HTMLTable>
+        )}
+        <Pagination currentPage={forecastPage} totalPages={forecastTotalPages} onPageChange={setForecastPage} />
+      </Card>
 
       {/* Incident Trends Chart */}
       {trendChartData.length > 1 && (

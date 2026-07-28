@@ -2,7 +2,7 @@ import { lazy, Suspense, useMemo, useState, useEffect, useRef, Component, type R
 import { Card, Tag, Intent, Spinner, Callout, Icon, Button, ButtonGroup } from "@blueprintjs/core";
 import { notifySevereIncident } from "../utils/notifications";
 import { useOsdkObjects } from "@osdk/react/experimental";
-import { LiveIncident, LiveLocation, LineStatus, CrisisResource, LiveTransportUnit } from "@crisis-logistics-command-app/sdk";
+import { LiveIncident, LiveLocation, LineStatus, CrisisResource, LiveTransportUnit, IncidentTrend } from "@crisis-logistics-command-app/sdk";
 
 const CrisisMap = lazy(() => import("@/components/CrisisMap"));
 
@@ -152,6 +152,41 @@ export default function Dashboard() {
   const disrupted = useOsdkObjects(LineStatus, { where: { isDisrupted: { $eq: true } }, pageSize: 100 });
   const resources = useOsdkObjects(CrisisResource, { pageSize: 100 });
   const units = useOsdkObjects(LiveTransportUnit, { pageSize: 200 });
+  const trends = useOsdkObjects(IncidentTrend, { pageSize: 30 });
+
+  // Anomaly detection: compare latest day's total to 7-day average
+  const anomaly = useMemo(() => {
+    const data = trends.data ?? [];
+    if (data.length < 4) { return null; }
+
+    // Aggregate incidentCount by date
+    const byDate = new Map<string, number>();
+    data.forEach(t => {
+      const d = String(t.incidentDate ?? "");
+      if (!d) { return; }
+      byDate.set(d, (byDate.get(d) ?? 0) + Number(t.incidentCount ?? 0));
+    });
+
+    const sortedDays = [...byDate.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]));
+
+    if (sortedDays.length < 3) { return null; }
+
+    const [latestDate, latestCount] = sortedDays[0];
+    const previousDays = sortedDays.slice(1, 8);
+    const avg = previousDays.reduce((sum, [, c]) => sum + c, 0) / previousDays.length;
+
+    if (avg <= 0) { return null; }
+    const ratio = latestCount / avg;
+
+    if (ratio >= 1.8) {
+      return { type: "SPIKE" as const, ratio: Math.round(ratio * 10) / 10, count: latestCount, avg: Math.round(avg), date: latestDate };
+    }
+    if (ratio <= 0.4 && latestCount > 0) {
+      return { type: "DROP" as const, ratio: Math.round(ratio * 10) / 10, count: latestCount, avg: Math.round(avg), date: latestDate };
+    }
+    return null;
+  }, [trends.data]);
 
   // Notify on new severe incidents
   const prevSevereCount = useRef(0);
@@ -218,9 +253,10 @@ export default function Dashboard() {
   // Metrics
   const incidentCount = filteredIncidents.length;
   const disruptedCount = disrupted.data?.length ?? 0;
-  const lowResources = (resources.data ?? []).filter(
+  const lowResourcesList = (resources.data ?? []).filter(
     r => (r.quantityUnits ?? 0) < (r.criticalThreshold ?? 0)
-  ).length;
+  );
+  const lowResources = lowResourcesList.length;
   const unitCount = units.data?.length ?? 0;
 
   const hasError = incidents.error || disrupted.error || resources.error || units.error;
@@ -231,6 +267,36 @@ export default function Dashboard() {
       {hasError && (
         <Callout intent={Intent.DANGER} title="Data Fetch Error" style={{ marginBottom: 12 }}>
           Some data could not be loaded. Please check your connection.
+        </Callout>
+      )}
+
+      {/* ─── Anomaly Alert Banner ─── */}
+      {anomaly && (
+        <Callout
+          intent={anomaly.type === "SPIKE" ? Intent.DANGER : Intent.PRIMARY}
+          icon={anomaly.type === "SPIKE" ? "warning-sign" : "trending-down"}
+          style={{ marginBottom: 12, fontWeight: 500 }}
+        >
+          <strong>⚠️ {anomaly.type} DETECTED:</strong>{" "}
+          {anomaly.type === "SPIKE"
+            ? `Today's incidents (${anomaly.count}) are ${anomaly.ratio}x above the 7-day average (${anomaly.avg}). Consider additional resources.`
+            : `Today's incidents (${anomaly.count}) are significantly below the 7-day average (${anomaly.avg}).`
+          }
+        </Callout>
+      )}
+
+      {/* ─── Low Stock Alert Banner ─── */}
+      {lowResources > 0 && (
+        <Callout
+          intent={Intent.WARNING}
+          icon="inbox"
+          style={{ marginBottom: 12, fontWeight: 500 }}
+        >
+          <strong>📦 LOW STOCK ALERT:</strong>{" "}
+          {lowResources === 1
+            ? `${lowResourcesList[0].resourceType ?? "A resource"} is below its critical threshold (${lowResourcesList[0].quantityUnits ?? 0} of ${lowResourcesList[0].criticalThreshold ?? 0} units). Restock recommended.`
+            : `${lowResources} resources are below their critical thresholds. Check the Resources tab to restock.`
+          }
         </Callout>
       )}
 

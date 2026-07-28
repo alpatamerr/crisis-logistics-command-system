@@ -14,6 +14,7 @@ from pyspark.sql.window import Window
     raw_incidents=Input("ri.foundry.main.dataset.26801c50-1ffa-46d5-be54-c9c6d3a47066"),
 )
 def compute(raw_incidents):
+    # Daily totals
     daily = (
         raw_incidents
         .filter(F.col("polled_at").isNotNull())
@@ -26,6 +27,7 @@ def compute(raw_incidents):
         )
     )
 
+    # 14-day rolling window for mean and stddev
     window_14d = Window.orderBy("incident_date").rowsBetween(-13, 0)
 
     result = (
@@ -39,7 +41,10 @@ def compute(raw_incidents):
                 (F.col("daily_count") - F.col("rolling_mean")) / F.col("rolling_stddev")
             ).otherwise(0.0)
         )
-        .withColumn("is_anomaly", F.abs(F.col("z_score")) > 2.0)
+        .withColumn(
+            "is_anomaly",
+            F.abs(F.col("z_score")) > 2.0
+        )
         .withColumn(
             "anomaly_type",
             F.when(F.col("z_score") > 2.0, "SPIKE")

@@ -1,7 +1,7 @@
 {
   "name": "crisis-logistics-command-app",
   "private": true,
-  "version": "31.0.0",
+  "version": "37.0.0",
   "type": "module",
   "scripts": {
     "build": "tsc && vite build",
@@ -17,7 +17,7 @@
   "dependencies": {
     "@blueprintjs/core": "^6.10.0",
     "@blueprintjs/icons": "^6.7.0",
-    "@crisis-logistics-command-app/sdk": "^0.2.0",
+    "@crisis-logistics-command-app/sdk": "^0.3.0",
     "@osdk/client": "^2.41.0",
     "@osdk/foundry": "latest",
     "@osdk/oauth": "^1.1.0",
