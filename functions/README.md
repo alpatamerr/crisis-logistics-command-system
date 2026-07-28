@@ -8,12 +8,18 @@ Server-side Foundry Functions (TypeScript v2) providing ontology-aware business 
 
 | Function | Purpose | Input | Output |
 |----------|---------|-------|--------|
-| `isBelowThreshold` | Function-backed column: identifies resources below critical threshold | `CrisisResource` objects | `Record<ObjectSpecifier<CrisisResource>, {isBelowThreshold: boolean}>` |
+| `isBelowThreshold` | Function-backed column: identifies resources below their critical threshold | `CrisisResource` objects | `Record<ObjectSpecifier<CrisisResource>, {isBelowThreshold: boolean}>` |
 | `countLowResources` | Metric: counts total resources needing resupply | All `CrisisResource` objects | `Integer` |
-| `searchAircraft` | Search and filter aircraft data | Search parameters | `Aircraft[]` |
 
 ## Logic
 
 ```typescript
 // Resource is critically low when:
 quantityUnits < criticalThreshold
+```
+
+These functions power function-backed columns and metrics in the Resources & Fleet tab, giving operators an at-a-glance view of which supplies need restocking — surfaced as the dashboard's low-stock alert banner.
+
+## License
+
+Portfolio/demonstration project. Source shared for review purposes.
