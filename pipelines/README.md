@@ -18,13 +18,15 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
 ### Key Capabilities
 
 - **Real-time incident tracking** from TfL disruption feeds
+- **Anomaly detection** — Z-score classification of daily incident spikes/drops
+- **Predictive forecasting** — high-risk windows by day, hour, and geographic zone
 - **Multi-modal transport monitoring** (bus, tube, rail, road, cycling, aviation)
 - **Helicopter detection** via ICAO aircraft type cross-referencing
 - **Resource inventory management** with threshold alerting
-- **Journey planning** with public transport routing between hubs and incidents
+- **Incident response tracking** — acknowledge / reroute / escalate audit trail
 - **Air quality monitoring** with live TfL forecasts
 - **Travel time analytics** via Google Distance Matrix API
-- **⚡ PySpark analytics** — incident trends, peak hour heatmaps, transport hotspot detection
+- **⚡ PySpark analytics** — incident trends, peak hour heatmaps, hotspot detection, anomaly detection, disruption forecasting
 
 ---
 
@@ -58,20 +60,22 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      ONTOLOGY LAYER (13 Object Types)               │
+│                      ONTOLOGY LAYER (15 Object Types)               │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Live Incident │ Location │ Transport Unit │ Line Status │ Road     │
 │  Bus Arrival   │ Crisis Resource │ Travel Time │ Journey Plan │ Air │
-│  ⚡ IncidentTrend │ ⚡ PeakHourHeatmap │ ⚡ TransportHotspot           │
+│  Incident Response │ ⚡ IncidentTrend │ ⚡ PeakHourHeatmap           │
+│  ⚡ TransportHotspot │ ⚡ DisruptionForecast                         │
 └─────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                   APPLICATION LAYER (Workshop / React OSDK App)     │
+│                   APPLICATION LAYER (React OSDK App)               │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Tab 1: Situation Map    │  Tab 2: Active Incidents                 │
 │  Tab 3: Transport Status │  Tab 4: Resources & Fleet                │
-│  Tab 5: Analytics + ⚡ PySpark Trends/Heatmap/Hotspots/Anomalies     │
+│  Tab 5: Analytics + ⚡ Forecast/Trends/Heatmap/Hotspots             │
+│  Role-based access · Anomaly & low-stock alerts                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -108,15 +112,17 @@ Longitude: -0.51 — -0.17
 | **Travel Time** | `TravelTime` | Distance Matrix results (hub → incident) | `travel_time_matrix` |
 | **Journey Plan** | `JourneyPlan` | Public transport routes (hub → hotspot) | `tfl_journey_plans` |
 | **Air Quality** | `AirQuality` | London air quality forecast bands | `tfl_air_quality` |
+| **Incident Response** | `IncidentResponse` | Acknowledge/reroute/escalate audit trail | Edits-based |
 | ⚡ **Incident Trend** | `IncidentTrend` | Daily trends + 7-day rolling averages (PySpark) | `incident_trend_analysis` |
 | ⚡ **Peak Hour Heatmap** | `PeakHourHeatmap` | Hour × day disruption frequency matrix (PySpark) | `peak_hour_heatmap` |
 | ⚡ **Transport Hotspot** | `TransportHotspot` | Geographic hotspot detection with severity scoring (PySpark) | `transport_reliability` |
+| ⚡ **Disruption Forecast** | `DisruptionForecast` | Predicted high-risk windows by day/hour/zone (PySpark) | `disruption_forecast` |
 
 ---
 
 ## ⚡ PySpark Analytics
 
-Four distributed analytics transforms using Apache Spark (Window functions, pivots, aggregations):
+Five distributed analytics transforms using Apache Spark (Window functions, pivots, aggregations):
 
 | Transform | PySpark Features | Output |
 |-----------|-----------------|--------|
@@ -124,15 +130,16 @@ Four distributed analytics transforms using Apache Spark (Window functions, pivo
 | `peak_hour_heatmap` | `.pivot()`, `F.hour()`, `F.dayofweek()`, cross-tab aggregation | Hour × day-of-week disruption frequency matrix |
 | `transport_reliability` | `F.row_number()`, `F.coalesce()`, severity weighting, spatial grid | Geographic hotspot ranking by severity-weighted score |
 | `anomaly_detection` | `Window.rowsBetween`, `F.stddev()`, Z-score, threshold classification | Daily anomaly flags (SPIKE/DROP/NORMAL) |
+| `disruption_forecast` | day × hour × zone aggregation, historical averaging, risk scoring | Predicted HIGH/MEDIUM/LOW risk windows |
 
-
-**Why PySpark?** 
+**Why PySpark?**
 
 Historical incident data accumulates over time (incremental ingestion). As weeks/months of data build up, these analytics require distributed compute for:
 - Window functions over large time ranges (rolling averages)
 - Cross-tab pivots on high-cardinality dimensions (hour × day × severity)
 - Spatial aggregation across thousands of grid cells
 - Statistical anomaly detection (Z-score over 14-day windows)
+- Pattern-based forecasting across day/hour/zone combinations
 
 ---
 
@@ -162,18 +169,20 @@ Production data quality checks on key transforms:
 
 ---
 
-## React OSDK / Workshop Application (5 Tabs)
+## React OSDK Application (5 Tabs)
 
-> See [`frontend/`](../frontend) for the full React source code.
+> See [`frontend/`](../frontend) for the full React source code. The app includes **role-based tab visibility** and **anomaly / low-stock alert banners**.
 
 ### Tab 1: Situation Map
 - Interactive map with dual layers: Incidents (severity-colored) + Locations
+- Anomaly and low-stock alert banners
 - TYPE and CATEGORY filter histograms, severity chips, time range filter
 - KPI metrics: Disrupted Lines, Active Incidents, Low Resources, Transport Units
 
 ### Tab 2: Active Incidents
-- Sortable incident log with severity/type filters and search
-- Detail panel with properties, description, and mini-map flyTo
+- Sortable incident log with an "Add filters" popover and search
+- Detail panel with properties, description, mini-map flyTo
+- Incident response workflow (acknowledge / reroute / escalate) with response history
 
 ### Tab 3: Transport Status
 - Disrupted Lines table with mode filters and search
@@ -182,13 +191,13 @@ Production data quality checks on key transforms:
 
 ### Tab 4: Resources & Fleet
 - Crisis Resource CRUD (Create with type dropdown + location selector, Update, Delete)
-- Resource type filter pills, Low Stock toggle, sortable quantity
+- "Add filters" popover (resource type + Low Stock toggle), sortable quantity
 - Transport Unit fleet overview with vehicle type filter
 
 ### Tab 5: Analytics
 - Travel Time Matrix with hub search and sort
-- Journey Plans with mode filter and sort
-- Metrics: Air Quality Band, Avg Travel Time, Routes Calculated
+- Metrics: Avg Travel Time, High-Risk Windows, Hotspot Zones
+- ⚡ **Weekly Disruption Forecast**: predicted high-risk windows by day/hour/zone
 - ⚡ **Incident Trends**: daily counts with 7-day rolling averages
 - ⚡ **Peak Disruption Hours**: hour × day-of-week heatmap
 - ⚡ **Transport Hotspots**: severity-ranked geographic zones
@@ -241,7 +250,7 @@ When Airlabs returns a flight with `aircraft_icao` matching a helicopter code, i
 | **Real-Time West London Feeds** | Every 15 min | incidents, line status, road status, bikepoints, raw incidents |
 | **Transport Tracking** | Every 15 min | bus arrivals, vehicle positions |
 | **Analytics Feeds** | Hourly | journey plans, air quality, travel time matrix |
-| **⚡ PySpark Analytics** | Daily | incident trends, peak hour heatmap, transport hotspots, anomaly detection |
+| **⚡ PySpark Analytics** | Daily | incident trends, peak hour heatmap, transport hotspots, anomaly detection, disruption forecast |
 
 ---
 
@@ -270,12 +279,12 @@ transforms-python/
 │   ├── ⚡ incident_trend_analysis.py  # PySpark: daily trends + rolling avg
 │   ├── ⚡ peak_hour_heatmap.py        # PySpark: hour × day cross-tab
 │   ├── ⚡ transport_reliability.py    # PySpark: hotspot detection
-│   └── ⚡ anomaly_detection.py        # PySpark: Z-score anomaly detection
+│   ├── ⚡ anomaly_detection.py        # PySpark: Z-score anomaly detection
+│   └── ⚡ disruption_forecast.py      # PySpark: day × hour × zone forecast
 ├── src/test/
 │   └── test_transforms.py            # Unit tests (pytest)
 ├── conda_recipe/meta.yaml            # Dependencies
 └── README.md
-
 ```
 
 ---
@@ -287,7 +296,7 @@ transforms-python/
 | **Platform** | Palantir Foundry / React OSDK |
 | **Transforms** | Python 3.12+ / PySpark / Polars |
 | **Functions** | TypeScript V2 (`@osdk/functions`) |
-| **Application** | Foundry Workshop / React OSDK |
+| **Application** | React OSDK |
 | **Compute** | Lightweight (single-node) + PySpark (distributed, 2 executors) |
 | **External APIs** | TfL, Google Maps, Airlabs |
 | **Scheduling** | Foundry Scheduler (cron-based) |
@@ -302,6 +311,7 @@ transforms-python/
 | **Create Crisis Resource** | Add new resource to inventory |
 | **Update Resource Inventory** | Modify quantity/threshold |
 | **Delete Crisis Resource** | Remove resource from tracking |
+| **Respond to Incident** | Record an acknowledge / reroute / escalate response with notes |
 
 ---
 
@@ -318,8 +328,8 @@ transforms-python/
    - Airlabs source with API key configured
 
 3. **Ontology Configuration:**
-   - 13 object types (see Object Types section)
-   - 3 action types for Crisis Resource CRUD
+   - 15 object types (see Object Types section)
+   - 4 action types (Crisis Resource CRUD + Respond to Incident)
    - 2 TypeScript V2 functions for threshold detection
 
 ---
@@ -338,4 +348,4 @@ All API keys are retrieved at runtime via `source.get_secret()` from Foundry's s
 
 ## License
 
-Proprietary, built for a private client; shared here for portfolio/demonstration purposes.
+Portfolio/demonstration project. Source shared for review purposes.
