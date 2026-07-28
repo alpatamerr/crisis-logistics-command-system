@@ -64,17 +64,17 @@ The Crisis Logistics Command System is an operational dashboard designed for cri
 ├─────────────────────────────────────────────────────────────────────┤
 │  Live Incident │ Location │ Transport Unit │ Line Status │ Road     │
 │  Bus Arrival   │ Crisis Resource │ Travel Time │ Journey Plan │ Air │
-│  Incident Response │ ⚡ IncidentTrend │ ⚡ PeakHourHeatmap           │
-│  ⚡ TransportHotspot │ ⚡ DisruptionForecast                         │
+│  Incident Response │ ⚡ IncidentTrend │ ⚡ PeakHourHeatmap            │
+│  ⚡ TransportHotspot │ ⚡ DisruptionForecast                          │
 └─────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                   APPLICATION LAYER (React OSDK App)               │
+│                   APPLICATION LAYER (React OSDK App)                │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Tab 1: Situation Map    │  Tab 2: Active Incidents                 │
 │  Tab 3: Transport Status │  Tab 4: Resources & Fleet                │
-│  Tab 5: Analytics + ⚡ Forecast/Trends/Heatmap/Hotspots             │
+│  Tab 5: Analytics + ⚡ Forecast/Trends/Heatmap/Hotspots              │
 │  Role-based access · Anomaly & low-stock alerts                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
