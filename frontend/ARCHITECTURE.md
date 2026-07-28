@@ -8,9 +8,9 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        EXTERNAL DATA SOURCES                        │
 ├──────────────┬──────────────────┬──────────────┬────────────────────┤
-│  TfL API     │  Google Maps     │  Air Quality │  Manual Input      │
-│  (Incidents, │  (Directions,    │  API         │  (OSDK Actions)    │
-│   Lines,     │   Distance       │              │                    │
+│  TfL API     │  Google Maps     │  Air Quality │  Airlabs Aviation  │
+│  (Incidents, │  (Directions,    │  API         │  (Aircraft         │
+│   Lines,     │   Distance       │              │   positions)       │
 │   Roads,     │   Matrix)        │              │                    │
 │   Buses)     │                  │              │                    │
 └──────┬───────┴────────┬─────────┴──────┬───────┴────────┬───────────┘
@@ -21,8 +21,8 @@
 ├─────────────────────────────────────────────────────────────────────┤
 │  ┌───────────────┐    ┌───────────────┐    ┌───────────────┐        │
 │  │  Data         │    │  Python       │    │  Ontology     │        │
-│  │  Connection   │───▶│  Transforms   │───▶│  (13 Object   │        │
-│  │  (TfL Sync)   │    │  + PySpark    │    │   Types)      │        │
+│  │  Connection   │───▶│  Transforms   │───▶│  (15 Object   │        │
+│  │  (API Syncs)  │    │  + PySpark    │    │   Types)      │        │
 │  │               │    │  Analytics    │    │               │        │
 │  └───────────────┘    └───────────────┘    └───────┬───────┘        │
 │                                                     │               │
@@ -46,24 +46,25 @@
 │                                                 │                   │
 │                                    ┌────────────▼────────────┐      │
 │                                    │       Home.tsx          │      │
-│                                    │    (Navbar + Tabs)      │      │
+│                                    │  Navbar + Role Selector │      │
+│                                    │        + Tabs           │      │
 │                                    └────────────┬────────────┘      │
 │                                                 │                   │
 │       ┌──────────┬──────────┬──────────┬────────┴───────┐           │
 │       ▼          ▼          ▼          ▼                ▼           │
 │  ┌─────────┐┌─────────┐┌─────────┐┌─────────┐  ┌──────────┐         │
 │  │Dashboard││ Active  ││Transport││Resources│  │Analytics │         │
-│  │         ││Incidents││ Status  ││ & Fleet │  │+ PySpark │         │
-│  │Map+Hist ││Table+   ││Lines+   ││CRUD+    │  │Trends+   │         │
-│  │+Metrics ││Detail   ││Roads+   ││Fleet    │  │Hotspots  │         │
-│  └─────────┘└─────────┘│Buses    │└─────────┘  └──────────┘         │
-│                        └─────────┘                                  │
+│  │Map+Hist ││Incidents││ Status  ││ & Fleet │  │Forecast+ │         │
+│  │+Metrics ││Table+   ││Lines+   ││CRUD+    │  │Trends+   │         │
+│  │+Anomaly ││Detail+  ││Roads+   ││Fleet    │  │Peaks+    │         │
+│  │+LowStock││Response ││Buses    │└─────────┘  │Hotspots  │         │
+│  └─────────┘└─────────┘└─────────┘             └──────────┘         │
 │                                                                     │
 │  Shared Components:                                                 │
-│  ┌──────────────────┐  ┌────────────┐  ┌──────────────┐             │
-│  │   CrisisMap      │  │   Error    │  │   Loading    │             │
-│  │   (Leaflet)      │  │  Boundary  │  │   Spinner    │             │
-│  └──────────────────┘  └────────────┘  └──────────────┘             │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────────┐      │
+│  │ CrisisMap  │ │ Pagination │ │ FilterBar  │ │    Error     │      │
+│  │ (Leaflet)  │ │(page-size) │ │ (popover)  │ │  Boundary    │      │
+│  └────────────┘ └────────────┘ └────────────┘ └──────────────┘      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,11 +73,13 @@
 ```
 1. User opens app → OAuth redirect → token obtained
 2. OsdkProvider2 initializes client with token
-3. Each page uses useOsdkObjects() to fetch data reactively
-4. Data is filtered/sorted client-side based on user interactions
-5. Actions (create/update/delete) use useOsdkAction() → writes back to Ontology
-6. Ontology syncs changes back to backing datasets
-7. PySpark analytics (trends, heatmap, hotspots) computed server-side, fetched via OSDK
+3. Role selector (localStorage) determines which tabs are visible
+4. Each page uses useOsdkObjects() to fetch data reactively
+5. Data is filtered/sorted client-side based on user interactions
+6. Anomaly detection is computed client-side from IncidentTrend rolling averages
+7. Actions (create/update/delete/respond) use useOsdkAction() → write back to Ontology
+8. Ontology syncs changes back to backing datasets
+9. PySpark analytics (trends, heatmap, hotspots, forecast, anomaly) computed server-side, fetched via OSDK
 ```
 
 ## Component Architecture
@@ -85,13 +88,15 @@
 
 The application uses **local component state** (useState/useMemo) rather than a global store. This is intentional:
 
-- Each tab manages its own filter/sort state independently
+- Each tab manages its own filter/sort/pagination state independently
 - `useOsdkObjects` provides built-in caching and reactivity
-- No cross-tab state dependencies exist
+- The only cross-cutting state is the **role selector**, persisted in `localStorage`
+
+### Role-Based Access
+
+The navbar role selector (All Access, Ops Manager, Dispatcher, Resource Officer, Shift Supervisor) filters which tabs are rendered. The selection persists across sessions via `localStorage`. This demonstrates the RBAC UX pattern; a production deployment would enforce access server-side via Foundry groups and object/action permissions.
 
 ### Map Component (`CrisisMap.tsx`)
-
-The map component handles three distinct use cases:
 
 | Use Case | Behavior |
 |----------|----------|
@@ -103,6 +108,11 @@ Key design decisions:
 - **Standard `<TileLayer>`** loads CartoDB tiles as `<img>` elements (CSP `img-src` compatible)
 - **Severity color coding**: Red (Severe) → Orange (Serious) → Blue (Moderate) → Gray (Minimal)
 - **Lazy loaded** via `React.lazy()` to prevent map JS from blocking initial render
+
+### Reusable UI Components
+
+- **`Pagination.tsx`** — numbered pagination (Back / 1 / 2 / … / Next) with a "show on page" size selector (10 / 25 / 50) and a range indicator, used across all data tables
+- **`FilterBar.tsx`** — a consistent "Add filters" popover with dismissable active-filter chips and a "Clear all" control, used across Active Incidents, Transport Status, Resources & Fleet, and Analytics
 
 ### Filtering Architecture
 
@@ -122,30 +132,38 @@ Rationale:
 OSDK Actions follow this pattern:
 
 ```
-User Input → useOsdkAction hook → Optimistic UI update → Server confirmation
+User Input → useOsdkAction hook → Server confirmation → Toast feedback
 ```
 
-Three actions are implemented:
-1. **Create** — form collects params, submits to action type
-2. **Update** — dialog pre-filled with current values, submits delta
-3. **Delete** — confirmation then delete
+Four user-facing actions are implemented:
+1. **Create Crisis Resource** — form collects params, submits to action type
+2. **Update Resource Inventory** — dialog pre-filled with current values, submits delta
+3. **Delete Crisis Resource** — confirmation then delete
+4. **Respond to Incident** — records an acknowledge / reroute / escalate response with notes, auto-stamping the current user and timestamp
 
-### PySpark Analytics (Tab 5)
+Incident responses form an **immutable audit trail** — they are recorded and displayed as a response-history timeline, never edited or deleted by end users. (A separate admin-only delete action exists for data cleanup and is not exposed in the UI.)
 
-Three server-side computed analytics consumed via OSDK:
+### PySpark Analytics
+
+Five server-side computed analytics consumed via OSDK:
 
 | Section | Object Type | PySpark Features |
 |---------|-------------|-----------------|
 | Incident Trends | `IncidentTrend` | `Window.rangeBetween`, rolling avg, `groupBy` |
 | Peak Hours | `PeakHourHeatmap` | `.pivot()`, `dayofweek()`, cross-tab |
 | Hotspots | `TransportHotspot` | `row_number()`, severity weighting, spatial grid |
+| Disruption Forecast | `DisruptionForecast` | day × hour × zone aggregation, risk scoring |
+| Anomaly Detection | (dataset) | Z-score over 14-day rolling window (SPIKE/DROP/NORMAL) |
+
+The anomaly signal is also derived client-side from `IncidentTrend` rolling averages to drive the Dashboard alert banner.
 
 ## Security Considerations
 
 - **OAuth 2.0** with PKCE flow (public client, no client secret)
 - **CSP** enforced by Foundry hosting — only whitelisted domains for img-src
 - **No secrets in source** — only public client ID and Foundry URL in .env files
-- **OSDK handles auth** — tokens are managed by the OAuth provider, never stored in localStorage manually
+- **OSDK handles auth** — tokens are managed by the OAuth provider
+- **Immutable audit trail** — incident responses capture who responded and when, and are not user-editable
 
 ## Performance
 
@@ -155,7 +173,8 @@ Three server-side computed analytics consumed via OSDK:
 | Lazy loading | Map component loaded via `React.lazy()` |
 | Memoization | `useMemo` for filtered/sorted data, histogram computations |
 | Tab rendering | `renderActiveTabPanelOnly={true}` — only active tab renders |
-| Pagination | "Load more" pattern for large tables (25 items at a time) |
+| Pagination | Numbered pagination with page-size control (10 / 25 / 50 per page) |
+| Query scoping | Response queries filtered server-side to exclude irrelevant rows |
 | Severity sorting | Pre-sorted by severity order for O(1) color lookups |
 
 ## Deployment
