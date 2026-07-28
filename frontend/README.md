@@ -11,10 +11,12 @@ A real-time operational dashboard for monitoring and managing crisis logistics a
 The Crisis Logistics Command Center provides real-time situational awareness for crisis management teams. It aggregates live data from Transport for London (TfL), Google Maps Platform, and custom Ontology objects to deliver:
 
 - **Live incident tracking** with severity-based visualization on an interactive map
+- **Anomaly detection** — automatic alerts when incident counts spike above the 7-day average
 - **Transport network monitoring** including tube lines, roads, and bus arrivals
 - **Resource inventory management** with CRUD operations and low-stock alerts
-- **Route analytics** with travel times and journey planning data
-- **Air quality monitoring** with current and forecasted conditions
+- **Incident response workflow** — acknowledge, reroute, or escalate with a full audit trail
+- **Predictive forecasting** — weekly high-risk windows by day, hour, and zone
+- **Role-based access** — each operational role sees only the tabs relevant to them
 - **⚡ PySpark-powered analytics** — incident trends, peak disruption hours, geographic hotspots
 
 ## 🏗️ Tech Stack
@@ -39,12 +41,14 @@ src/
 ├── client.ts                    # OSDK OAuth client setup
 ├── router.tsx                   # Routes: / and /auth/callback
 ├── AuthCallback.tsx             # OAuth callback handler
-├── Home.tsx                     # Main layout — Navbar + Tabs + Live indicator + Auto-refresh
-├── Home.css                     # Navbar gradient, live pulse animation
-├── index.css                    # Global styles, grid layouts, hover effects, shimmer skeleton
+├── Home.tsx                     # Main layout — Navbar + role selector + Tabs + Live indicator
+├── Home.css                     # Navbar gradient, role selector, live pulse animation
+├── index.css                    # Global styles, grid layouts, pagination, filter bar, skeletons
 │
 ├── components/
 │   ├── CrisisMap.tsx            # Leaflet map with severity markers, legend, reset view
+│   ├── Pagination.tsx           # Numbered pagination with page-size control
+│   ├── FilterBar.tsx            # "Add filters" popover with active-filter chips
 │   ├── SectionErrorBoundary.tsx # Per-section error boundary with retry button
 │   ├── ErrorBoundary.tsx        # Global error boundary
 │   └── Loading.tsx              # Loading spinner
@@ -55,17 +59,16 @@ src/
 │   └── notifications.ts         # Browser notification for severe incidents
 │
 └── pages/
-    ├── Dashboard.tsx            # Tab 1: Map + histograms + metrics + severe alert
-    ├── ActiveIncidents.tsx      # Tab 2: Incident table + detail panel + CSV export
+    ├── Dashboard.tsx            # Tab 1: Map + histograms + metrics + anomaly & low-stock banners
+    ├── ActiveIncidents.tsx      # Tab 2: Incident table + detail + response workflow + history
     ├── TransportStatus.tsx      # Tab 3: Disrupted lines, roads, bus arrivals
     ├── ResourcesFleet.tsx       # Tab 4: Resource CRUD + toast + fleet monitoring
-    └── Analytics.tsx            # Tab 5: Charts + tables + PySpark analytics
-
+    └── Analytics.tsx            # Tab 5: Forecast + trends + peak hours + hotspots
 ```
 
 ## 🗄️ Ontology Data Model
 
-### Object Types (13)
+### Object Types (15)
 
 | Object Type | Primary Key | Description |
 |-------------|-------------|-------------|
@@ -82,19 +85,26 @@ src/
 | ⚡ `IncidentTrend` | `trendId` | Daily trends with 7-day rolling averages (PySpark) |
 | ⚡ `PeakHourHeatmap` | `heatmapId` | Hour × day disruption frequency matrix (PySpark) |
 | ⚡ `TransportHotspot` | `gridCell` | Geographic hotspot detection with severity scoring (PySpark) |
+| ⚡ `DisruptionForecast` | `forecastId` | Predicted high-risk windows by day, hour, and zone (PySpark) |
+| `IncidentResponse` | `responseId` | Operational response audit trail (acknowledge / reroute / escalate) |
 
-### Action Types (3)
+### Action Types (4)
 
 | Action | Description |
 |--------|-------------|
 | **Create Crisis Resource** | Add new inventory items to a location |
 | **Update Resource Inventory** | Modify quantity of existing resources |
 | **Delete Crisis Resource** | Remove a resource record |
+| **Respond to Incident** | Record an acknowledge / reroute / escalate response with notes |
 
 ## 🖥️ Application Tabs
 
+The navbar includes a **role selector** (All Access, Ops Manager, Dispatcher, Resource Officer, Shift Supervisor) that filters the visible tabs to those relevant for each role. The Situation Overview is always available.
+
 ### Tab 1: Situation Overview
 Three-column layout with interactive histogram filters on each side and a Leaflet map in the center. Features:
+- **Anomaly alert banner** — appears when incident counts spike above the 7-day average
+- **Low-stock alert banner** — appears when resources drop below their critical threshold
 - **Multi-select** incident type and location category histograms
 - **Severity filter chips** (Severe / Serious / Moderate / Minimal)
 - **Time range filter** (All Time / 1h / 6h / 24h / 7d)
@@ -103,21 +113,21 @@ Three-column layout with interactive histogram filters on each side and a Leafle
 
 ### Tab 2: Active Incidents
 Master-detail split layout:
-- Left: searchable, sortable incident table with severity filter chips and type dropdown
-- Right: selected incident detail panel with description, metadata, and a mini-map that flies to the incident location
+- Left: searchable, sortable incident table with an **"Add filters"** popover (severity + type), CSV export, and numbered pagination. A badge shows how many responses each incident has received.
+- Right: selected incident detail panel with description, metadata, a mini-map that flies to the location, and an **incident response workflow** — acknowledge, reroute, or escalate with notes, plus a **response history timeline**
 
 ### Tab 3: Transport Status
-- **Full-width disrupted lines** table with mode filter pills and search
-- **Two-column bottom**: road status (with severity filter + search) and bus arrivals
+- **Disrupted lines** table with an "Add filters" popover (transport mode) and search
+- **Road status** (severity filter + search) and **bus arrivals**
 
 ### Tab 4: Resources & Fleet
-- **Resources section**: type filter pills, "Low Stock Only" toggle, sortable quantity column, inline create form, edit/delete actions via OSDK
-- **Fleet section**: vehicle type filter pills, status indicators
+- **Resources section**: "Add filters" popover (resource type + "Low Stock Only" toggle), sortable quantity column, inline create form, edit/delete actions via OSDK
+- **Fleet section**: vehicle type filter, last-seen timestamps, numbered pagination
 
 ### Tab 5: Analytics
-- **3 metric cards**: Air Quality, Avg Travel Time, Routes Calculated
+- **3 metric cards**: Avg Travel Time, High-Risk Windows, Hotspot Zones
 - **Travel Times table**: sortable by travel time, searchable by hub name
-- **Journey Plans table**: sortable by duration, filterable by transport mode
+- ⚡ **Weekly Disruption Forecast**: predicted HIGH/MEDIUM risk windows by day, hour, and zone (PySpark)
 - ⚡ **Incident Trends**: daily counts by severity with 7-day rolling averages (PySpark)
 - ⚡ **Peak Disruption Hours**: hour × day-of-week frequency matrix (PySpark)
 - ⚡ **Transport Hotspots**: ranked geographic areas by severity-weighted score (PySpark)
@@ -187,24 +197,23 @@ https://*.basemaps.cartocdn.com
 | **Google Maps Platform** | Travel times, distance calculations, journey planning |
 | **Manual Entry** | Crisis resources (via OSDK Actions) |
 | **Air Quality API** | London air quality forecasts |
-| **⚡ PySpark Analytics** | Incident trends, peak hours, transport hotspots |
+| **⚡ PySpark Analytics** | Incident trends, peak hours, hotspots, disruption forecast |
 
 ## 🛠️ Key Technical Decisions
 
-1. **`@osdk/react` experimental hooks** (`useOsdkObjects`, `useOsdkAction`) — provides reactive data fetching with automatic caching
+1. **`@osdk/react` experimental hooks** (`useOsdkObjects`, `useOsdkAction`) — reactive data fetching with automatic caching
 2. **Leaflet over Google Maps** — Google Maps blocked by CSP `script-src 'self'`; Leaflet works with `img-src` CSP for tile loading
 3. **Client-side filtering and sorting** — all data loaded via OSDK, then filtered/sorted in-memory for instant UI response
 4. **BlueprintJS** — Palantir's own design system ensures visual consistency with Foundry Workshop
 5. **Lazy-loaded map** — `CrisisMap` uses `React.lazy()` to avoid blocking initial page load
-6. **Vite 8 + Rolldown** — Rust-based bundler for ~430ms production builds (10x faster than Vite 7)
+6. **Vite 8 + Rolldown** — Rust-based bundler for ~430ms production builds
 7. **Auto-refresh (15min)** — visible countdown timer in navbar; manual refresh on click; matches pipeline schedule
-8. **Browser notifications** — alerts operators when new severe incidents are detected
-9. **Per-section error boundaries** — one tab crashing doesn't bring down the entire app; each section has retry
-10. **Recharts** — lightweight React-native charting for incident trends, peak hours bar chart, hotspot severity ranking
-11. **Toast notifications** — immediate feedback after CRUD operations (create/update/delete)
-12. **CSV export** — one-click data download for incident records
-
+8. **Anomaly detection** — client-side comparison of latest-day incidents to the 7-day rolling average, surfaced as an alert banner
+9. **Role-based tab visibility** — localStorage-backed role selector filters tabs per operational persona (demonstrates the RBAC UX pattern; production would enforce via Foundry groups)
+10. **Immutable response audit trail** — incident responses are recorded, never edited or deleted, for operational traceability
+11. **Per-section error boundaries** — one tab crashing doesn't bring down the entire app; each section has retry
+12. **Reusable Pagination & FilterBar** — numbered pagination with page-size control and a consistent "Add filters" popover across all tables
 
 ## 📝 License
 
-Proprietary, built for a private client; shared here for portfolio/demonstration purposes.
+Portfolio/demonstration project. Source shared for review purposes.
