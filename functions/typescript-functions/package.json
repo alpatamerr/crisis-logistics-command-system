@@ -31,7 +31,7 @@
     "@osdk/foundry-sdk-generator": "2.41.0",
     "@osdk/unit-testing": "0.15.0",
     "@types/node": "^24.12.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.11"
   },
   "scripts": {
     "test": "vitest run",
